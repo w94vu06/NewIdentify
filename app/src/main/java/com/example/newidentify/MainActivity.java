@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     Button btn_choose,btn_identify;
     TextView txt_file,txt_result;
     /** Parameter **/
-    private String filePath,fileName;
+    private String filePath,fileName,ans = "";
     private int y,count;
     private Boolean x;
     private ChooserDialog chooserDialog; //檔案選擇器
@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
         btn_identify = findViewById(R.id.btn_identify);
         txt_file = findViewById(R.id.txt_file);
         txt_result = findViewById(R.id.txt_result);
-        y = 5;
+        y = 5; //設定檔案收集數量
         try {
             File file = new File(filePath);
             if (file.mkdir()) {
@@ -198,13 +198,14 @@ public class MainActivity extends AppCompatActivity {
                     PI.add(Double.parseDouble(dataMap.get("PI")));
                     CVI.add(Double.parseDouble(dataMap.get("CVI")));
                     C1a.add(Double.parseDouble(dataMap.get("C1a")));
-                    txt_result.setText(String.valueOf(heartRate.size()));
                     getValue();
                 }else if (heartRate.size() == y){
                     judgeValue();
                 }
                 Log.d("getListSize",String.valueOf(heartRate.size()));
                 Log.d("ListValue",heartRate.toString());
+                String s = String.format("%s \nHR: %s \nPI: %s \nCVI: %s \nC1a: %s \n輸入檔案數量: %d",ans,heartRate.toString(),PI.toString(),CVI.toString(),C1a.toString(),count);
+                txt_result.setText(s);
                 reader.close();
             }
         } catch (Exception e){
@@ -226,7 +227,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void judgeValue(){
-        String ans;
         for (Double value : heartRate){
             if (value > 100 || value > averageHR*1.2){
                 x = true;
@@ -241,7 +241,6 @@ public class MainActivity extends AppCompatActivity {
         }
         try {
             if (ans.equals("本人")){
-                txt_result.setText(count+" "+count%y+" "+ans);
                 Log.d("ListValue",dataMap.get("Average"));
                 heartRate.set(count%y-1,Double.parseDouble(dataMap.get("Average")));
                 PI.set(count%y-1,Double.parseDouble(dataMap.get("PI")));
