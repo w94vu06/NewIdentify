@@ -684,15 +684,15 @@ double Cal_HRV_C1a(double *rr_intervals, int size);
 double Cal_HRV_ShanEn(double rr_intervals[], int size, double * pMedianRR);
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_newidentify_MainActivity_anaEcgFile(JNIEnv* env, jobject /* this */, jstring str){
+Java_com_example_newidentify_MainActivity_anaEcgFile(JNIEnv* env, jobject /* this */, jstring str, jstring path){
     char chaFileName[256];
     strcpy(chaFileName, env ->GetStringUTFChars(str, JNI_FALSE));
 
 //    strcpy(ECGFilePath, "/home/user/RemoteECG/ECG_Files/LabeledEcgFiles/20170421/");
 
-    strcpy(ECGFilePath, "/storage/emulated/0/ECGFiles/");
+//    strcpy(ECGFilePath, "/storage/emulated/0/ECGFiles/");
 
-//    strcpy(ECGFilePath, env ->GetStringUTFChars(path, JNI_FALSE));
+    strcpy(ECGFilePath, env ->GetStringUTFChars(path, JNI_FALSE));
     strcpy(ECGDirUrl, "../ECGFiles/");
 
     unsigned short * pECGFrameOri = (unsigned short *)ECGFrameOri;
@@ -806,7 +806,7 @@ Java_com_example_newidentify_MainActivity_anaEcgFile(JNIEnv* env, jobject /* thi
     strcpy(lpszFileName, "");
     strcat(lpszFileName, ECGFilePath);
     strcat(lpszFileName, inCHAFileName);
-    __android_log_print(ANDROID_LOG_ERROR, "native-log", "%s",lpszFileName);
+    __android_log_print(ANDROID_LOG_ERROR, "cppGet", "%s",lpszFileName);
 //    strcat(lpszFileName, ".cha");
 
     // For debug

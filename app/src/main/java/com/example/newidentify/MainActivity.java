@@ -115,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
                                 filePath = dir;
                                 File file = new File(dir);
                                 fileName = file.getName();
-                                path = file.getParent();
+                                path = filePath.substring(0,filePath.length()-fileName.length());
                                 txt_file.setText(fileName);
                             }
                         })
@@ -165,13 +165,13 @@ public class MainActivity extends AppCompatActivity {
 
     /** 執行c++檔 **/
     private void initIdentify(){
-        int x = anaEcgFile(fileName);
+        int x = anaEcgFile(fileName, path);
         if (x == 1){
             txt_result.setText("檔案訊號error，請換個檔案繼續");
         }else {
             count +=1;
         }
-        filePath = "/storage/emulated/0/ECGFiles/";
+        filePath = path;
         fileName = fileName.substring(0,fileName.length()-4);
         try {
             File file = new File(filePath+"/r_"+fileName+".txt");
@@ -304,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
         dialog.setCanceledOnTouchOutside(false);
     }
 
-    public native int anaEcgFile(String name);
+    public native int anaEcgFile(String name, String path);
 
     public native int decpEcgFile(String path);
 }
