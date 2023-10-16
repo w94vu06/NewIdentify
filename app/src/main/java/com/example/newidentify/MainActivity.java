@@ -28,9 +28,9 @@ public class MainActivity extends AppCompatActivity {
 
     /** UI **/
     Button btn_choose,btn_identify;
-    TextView txt_file,txt_result;
+    TextView txt_file,txt_result,txt_value,txt_count;
     /** Parameter **/
-    private String filePath,fileName,ans = "";
+    private String filePath,fileName,ans;
     private int y,count;
     private Boolean x;
     private ChooserDialog chooserDialog; //檔案選擇器
@@ -42,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
     double averageHR, averagePI, averageCVI, averageC1a;
     double maxPI, maxCVI, maxC1a;
     double minPI, minCVI, minC1a;
+    double ValueHR, ValuePI, ValueCvi, ValueC1a;
 
     identifyPlan identifyPlan = new identifyPlan();
 
@@ -65,7 +66,9 @@ public class MainActivity extends AppCompatActivity {
         btn_identify = findViewById(R.id.btn_identify);
         txt_file = findViewById(R.id.txt_file);
         txt_result = findViewById(R.id.txt_result);
-        y = 5; //設定檔案收集數量
+        txt_value = findViewById(R.id.txt_value);
+        txt_count = findViewById(R.id.txt_count);
+        y = 5; //設定檔案收集數量，最高20
         try {
             File file = new File(filePath);
             if (file.mkdir()) {
@@ -109,13 +112,10 @@ public class MainActivity extends AppCompatActivity {
                         .withChosenListener(new ChooserDialog.Result() {
                             @Override
                             public void onChoosePath(String dir, File dirFile) {
-                                filePath = dir;
-                                txt_file.setText(filePath);
                                 File file = new File(dir);
                                 fileName = file.getName();
                                 filePath = file.getParent();
-                                Log.d("fileName",fileName);
-                                Log.d("filePath",filePath);
+                                txt_file.setText(fileName);
                             }
                         })
                         .withOnBackPressedListener(dialog -> chooserDialog.goBack())
@@ -146,8 +146,8 @@ public class MainActivity extends AppCompatActivity {
                 if (fileName != null){
                     if (fileName.endsWith(".lp4")){
                         decpEcgFile(filePath);
-                        int y = fileName.length();
-                        String j = fileName.substring(0,y-4);
+                        int u = fileName.length();
+                        String j = fileName.substring(0,u-4);
                         fileName = j + ".cha";
                         initIdentify();
                     } else if (fileName.endsWith(".cha") | fileName.endsWith(".CHA")) {
@@ -164,13 +164,12 @@ public class MainActivity extends AppCompatActivity {
 
     /** 執行c++檔 **/
     private void initIdentify(){
-        int x = stringFromJNI(fileName,filePath);
+        int x = anaEcgFile(fileName,filePath);
         if (x == 1){
             txt_result.setText("檔案訊號error，請換個檔案繼續");
         }else {
             count +=1;
         }
-        Log.d("getValue",String.valueOf(x));
         filePath = "/storage/emulated/0/ECGFiles/test/";
         fileName = fileName.substring(0,fileName.length()-4);
         try {
@@ -192,20 +191,29 @@ public class MainActivity extends AppCompatActivity {
                         dataMap.put(name, value);
                     }
                 }
-                Log.d("getMap", dataMap.toString());
+                ValueHR = Double.parseDouble(dataMap.get("Average"));
+                ValuePI = Double.parseDouble(dataMap.get("PI"));
+                ValueCvi = Double.parseDouble(dataMap.get("CVI"));
+                ValueC1a = Double.parseDouble(dataMap.get("C1a"));
                 if (heartRate.size() < y){
-                    heartRate.add(Double.parseDouble(dataMap.get("Average")));
-                    PI.add(Double.parseDouble(dataMap.get("PI")));
-                    CVI.add(Double.parseDouble(dataMap.get("CVI")));
-                    C1a.add(Double.parseDouble(dataMap.get("C1a")));
+                    heartRate.add(ValueHR);
+                    PI.add(ValuePI);
+                    CVI.add(ValueCvi);
+                    C1a.add(ValueC1a);
                     getValue();
                 }else if (heartRate.size() == y){
                     judgeValue();
                 }
+                String s = String.format("HR: %s \nPI: %s \nCVI: %s \nC1a: %s",heartRate.toString(),PI.toString(),CVI.toString(),C1a.toString());
                 Log.d("getListSize",String.valueOf(heartRate.size()));
-                Log.d("ListValue",heartRate.toString());
-                String s = String.format("%s \nHR: %s \nPI: %s \nCVI: %s \nC1a: %s \n輸入檔案數量: %d",ans,heartRate.toString(),PI.toString(),CVI.toString(),C1a.toString(),count);
-                txt_result.setText(s);
+                Log.d("ListValue",s);
+                if (ans != null){
+                    txt_result.setText(ans);
+                }else{
+                    txt_result.setText("檔案數量不足");
+                }
+                txt_value.setText(s);
+                txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d",y,count));
                 reader.close();
             }
         } catch (Exception e){
@@ -230,22 +238,25 @@ public class MainActivity extends AppCompatActivity {
         for (Double value : heartRate){
             if (value > 100 || value > averageHR*1.2){
                 x = true;
+                Log.d("HRValue",String.format("x: %b\nhr: %f\naverageHR: %f\naverageHR*1.2: %f",x,value,averageHR,averageHR*1.2));
+                break;
             }else {
                 x = false;
+                Log.d("HRValue",String.format("averageHR: %f\naverageHR*1.2: %f",averageHR,averageHR*1.2));
             }
         }
         if (x == true || maxPI-minPI > 0.25 || maxCVI-minCVI > 4.5 || abs(maxC1a-averageC1a) >= 20 || abs(minC1a-averageC1a) >= 20){
-            ans = identifyPlan.Second(averageHR, averagePI, averageCVI, averageC1a);
+            ans = identifyPlan.Second(averageHR, ValueHR, averagePI, ValuePI, averageCVI, ValueCvi, averageC1a, ValueC1a);
         }else {
-            ans = identifyPlan.First(averageHR, averagePI, averageCVI, averageC1a);
+            ans = identifyPlan.First(averageHR, ValueHR, averagePI, ValuePI, averageCVI, ValueCvi, averageC1a, ValueC1a);
         }
         try {
             if (ans.equals("本人")){
                 Log.d("ListValue",dataMap.get("Average"));
-                heartRate.set(count%y-1,Double.parseDouble(dataMap.get("Average")));
-                PI.set(count%y-1,Double.parseDouble(dataMap.get("PI")));
-                CVI.set(count%y-1,Double.parseDouble(dataMap.get("CVI")));
-                C1a.set(count%y-1,Double.parseDouble(dataMap.get("C1a")));
+                heartRate.set(count%y-1,ValueHR);
+                PI.set(count%y-1,ValuePI);
+                CVI.set(count%y-1,ValueCvi);
+                C1a.set(count%y-1,ValueC1a);
             }else{
                 newDialog();
             }
@@ -273,6 +284,14 @@ public class MainActivity extends AppCompatActivity {
                     y = 20;
                     break;
             }
+            heartRate.add(ValueHR);
+            PI.add(ValuePI);
+            CVI.add(ValueCvi);
+            C1a.add(ValueC1a);
+            String s = String.format("HR: %s \nPI: %s \nCVI: %s \nC1a: %s",heartRate.toString(),PI.toString(),CVI.toString(),C1a.toString());
+            txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d",y,count));
+            txt_result.setText("檔案數量不足");
+            txt_value.setText(s);
             dialog.dismiss();
         }));
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener((v ->{
@@ -284,7 +303,7 @@ public class MainActivity extends AppCompatActivity {
         dialog.setCanceledOnTouchOutside(false);
     }
 
-    public native int stringFromJNI(String name, String path);
+    public native int anaEcgFile(String name, String path);
 
     public native int decpEcgFile(String path);
 }

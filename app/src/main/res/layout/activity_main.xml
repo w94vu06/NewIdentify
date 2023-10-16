@@ -12,7 +12,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:text="用戶登入"
+        android:text="用戶識別"
         android:fontFamily="@font/glowsanssc_condensed_book"
         android:textColor="@color/gray"
         android:textSize="20sp"/>
@@ -63,6 +63,28 @@
         android:layout_gravity="center"
         android:layout_marginTop="10dp"
         android:text="結果確認"
+        android:fontFamily="@font/glowsanssc_condensed_book"
+        android:textColor="@color/gray"
+        android:textSize="15sp"/>
+
+    <TextView
+        android:id="@+id/txt_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="10dp"
+        android:text="計算數值"
+        android:fontFamily="@font/glowsanssc_condensed_book"
+        android:textColor="@color/gray"
+        android:textSize="15sp"/>
+
+    <TextView
+        android:id="@+id/txt_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="10dp"
+        android:text="檔案數量"
         android:fontFamily="@font/glowsanssc_condensed_book"
         android:textColor="@color/gray"
         android:textSize="15sp"/>

@@ -684,7 +684,7 @@ double Cal_HRV_C1a(double *rr_intervals, int size);
 double Cal_HRV_ShanEn(double rr_intervals[], int size, double * pMedianRR);
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_newidentify_MainActivity_stringFromJNI(JNIEnv* env, jobject /* this */, jstring str, jstring path){
+Java_com_example_newidentify_MainActivity_anaEcgFile(JNIEnv* env, jobject /* this */, jstring str, jstring path){
     char chaFileName[256];
     strcpy(chaFileName, env ->GetStringUTFChars(str, JNI_FALSE));
 
