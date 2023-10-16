@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     Button btn_choose,btn_identify;
     TextView txt_file,txt_result,txt_value,txt_count;
     /** Parameter **/
-    private String filePath,fileName,ans;
+    private String path,filePath,fileName,ans;
     private int y,count;
     private Boolean x;
     private ChooserDialog chooserDialog; //檔案選擇器
@@ -112,9 +112,10 @@ public class MainActivity extends AppCompatActivity {
                         .withChosenListener(new ChooserDialog.Result() {
                             @Override
                             public void onChoosePath(String dir, File dirFile) {
+                                filePath = dir;
                                 File file = new File(dir);
                                 fileName = file.getName();
-                                filePath = file.getParent();
+                                path = file.getParent();
                                 txt_file.setText(fileName);
                             }
                         })
@@ -164,13 +165,13 @@ public class MainActivity extends AppCompatActivity {
 
     /** 執行c++檔 **/
     private void initIdentify(){
-        int x = anaEcgFile(fileName,filePath);
+        int x = anaEcgFile(fileName);
         if (x == 1){
             txt_result.setText("檔案訊號error，請換個檔案繼續");
         }else {
             count +=1;
         }
-        filePath = "/storage/emulated/0/ECGFiles/test/";
+        filePath = "/storage/emulated/0/ECGFiles/";
         fileName = fileName.substring(0,fileName.length()-4);
         try {
             File file = new File(filePath+"/r_"+fileName+".txt");
@@ -303,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
         dialog.setCanceledOnTouchOutside(false);
     }
 
-    public native int anaEcgFile(String name, String path);
+    public native int anaEcgFile(String name);
 
     public native int decpEcgFile(String path);
 }
