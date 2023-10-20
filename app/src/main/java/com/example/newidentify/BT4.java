@@ -600,24 +600,23 @@ public class BT4 {
 
                             Log.d("wwwww", "SSS33333");
 
-                            int countdown = 30; // 倒计时秒数
-                            while (isWave && countdown > 0) {
-                                // 更新倒计时的TextView
-                                final int finalCountdown = countdown;
-                                global_activity.runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        MainActivity.txt_countDown.setText(finalCountdown + " 秒");
-                                    }
-                                });
-                                SystemClock.sleep(1000); // 每秒等待
-                                countdown--;
-                            }
-
-                            if (isWave) {
-                                StopMeasure(new Handler());
-
-                            }
+//                            int countdown = 30; // 倒计时秒数
+//                            while (isWave && countdown > 0) {
+//                                // 更新倒计时的TextView
+//                                final int finalCountdown = countdown;
+//                                global_activity.runOnUiThread(new Runnable() {
+//                                    @Override
+//                                    public void run() {
+//                                        MainActivity.txt_countDown.setText(finalCountdown + " 秒");
+//                                    }
+//                                });
+//                                SystemClock.sleep(1000); // 每秒等待
+//                                countdown--;
+//                            }
+//
+//                            if (isWave) {
+//                                StopMeasure(new Handler());
+//                            }
 
                             while (isWave) {
                                 try {

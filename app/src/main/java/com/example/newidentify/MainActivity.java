@@ -18,6 +18,7 @@ import android.graphics.Color;
 import android.media.MediaScannerConnection;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
@@ -631,7 +632,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @SuppressLint("HandlerLeak")
-    public void StopAction(View view) {
+    public void RecordWaveAction(View view) {
+        bt4.Bluetooth_init();
+        if (bt4.isconnect) {
+            bt4.Wave(true, new Handler());
+            new CountDownTimer(30000, 1000) { // 30秒的倒數計時，每秒觸發一次onTick
+                public void onTick(long millisUntilFinished) {
+                    // 每次倒數計時觸發的操作，這裡可以更新UI以顯示剩餘時間
+                    txt_countDown.setText(millisUntilFinished / 1000+"");
+                }
+
+                public void onFinish() {
+                    // 倒數結束後執行的操作
+                    txt_countDown.setText("30");
+                    StopWave();
+                }
+            }.start();
+        }
+    }
+
+    @SuppressLint("HandlerLeak")
+    public  void StopAction(View view) {
         ShowToast("正在停止跑波...");
         bt4.StopMeasure(new Handler() {
             @Override
@@ -639,16 +660,65 @@ public class MainActivity extends AppCompatActivity {
                 ShowToast("完成停止跑波");
             }
         });
-//        txt_result.setText("");
-//        txt_count.setText("");
-//        txt_value.setText("");
+        final int[] step = {0};
+        bt4.Record_Size(new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                if (step[0] == 0) {
+                    Log.d("wwwww", "讀取檔案大小");
+                    bt4.File_Size(this);
+                }
+
+                if (step[0] == 1) {
+                    Log.d("wwwww", "打開檔案");
+
+                    bt4.Open_File(this);
+                }
+
+                if (step[0] == 2) {
+                    Log.d("wwwww", "讀取檔案");
+                    bt4.ReadData(this);
+                    saveLP4(bt4.file_data);
+                }
+                step[0]++;
+            }
+        });
     }
     @SuppressLint("HandlerLeak")
-    public void RecordWaveAction(View view) {
-        bt4.Bluetooth_init();
+    public  void StopWave() {
+        ShowToast("正在停止跑波...");
+        bt4.StopMeasure(new Handler() {
+            @Override
+            public void handleMessage(Message msg2) {
+                ShowToast("完成停止跑波");
+            }
+        });
+        final int[] step = {0};
+        bt4.Record_Size(new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                if (step[0] == 0) {
+                    Log.d("wwwww", "讀取檔案大小");
 
-        bt4.Wave(true, new Handler());
+                    bt4.File_Size(this);
+                }
+
+                if (step[0] == 1) {
+                    Log.d("wwwww", "打開檔案");
+
+                    bt4.Open_File(this);
+                }
+
+                if (step[0] == 2) {
+                    Log.d("wwwww", "讀取檔案");
+                    bt4.ReadData(this);
+                    saveLP4(bt4.file_data);
+                }
+                step[0]++;
+            }
+        });
     }
+
     @SuppressLint("HandlerLeak")
     public void ReadFileAction(View view) {
 
@@ -723,6 +793,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
+
 
     public static String encodeFileToBase64Binary(ArrayList<Byte> datalist) {
         byte[] bytes = new byte[datalist.size()];
