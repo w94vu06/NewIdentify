@@ -452,6 +452,7 @@ public class MainActivity extends AppCompatActivity {
             txt_result.setText("");
             txt_count.setText("");
             txt_value.setText("");
+            initchart();
 //            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
 //            startActivity(intent);
 //            finish();
@@ -805,6 +806,8 @@ public class MainActivity extends AppCompatActivity {
 
     public void initchart()
     {
+
+        chart1.clear();
         //圖表設定2（開始頁）
         chart1.setData(new LineData());
         chart1.getXAxis().setValueFormatter(null);
