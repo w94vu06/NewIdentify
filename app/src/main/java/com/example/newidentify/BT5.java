@@ -2,12 +2,10 @@ package com.example.newidentify;
 
 
 import static android.content.Context.BLUETOOTH_SERVICE;
-
-import static com.example.newidentify.MainActivity.BT_Status_Text;
-import static com.example.newidentify.MainActivity.DrawChart;
-import static com.example.newidentify.MainActivity.ShowToast;
-import static com.example.newidentify.MainActivity.global_activity;
-//import static com.example.newidentify.LoginActivity.global_activity;
+import static com.example.newidentify.LoginActivity.BT_Status_Text;
+import static com.example.newidentify.LoginActivity.DrawChart;
+import static com.example.newidentify.LoginActivity.ShowToast;
+import static com.example.newidentify.LoginActivity.global_activity;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -42,7 +40,7 @@ import java.util.UUID;
 
 
 @SuppressLint("MissingPermission")
-public class BT4 {
+public class BT5 {
 
     public String bluetooth_Tag = "wwwww";
 

@@ -131,5 +131,7 @@ JNICALL Java_com_example_newidentify_MainActivity_decpEcgFile
 }
 
 
-
-
+JNIEXPORT jint JNICALL
+Java_com_example_newidentify_LoginActivity_decpEcgFile(JNIEnv *env, jobject thiz, jstring path) {
+    // TODO: implement decpEcgFile()
+}

@@ -6985,3 +6985,10 @@ int CBeatClassify::NoiseCheck(int datum, int delay, int RR, int beatBegin, int b
         NoiseEstimate = 0 ;
     return(NoiseEstimate) ;
 }
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_example_newidentify_LoginActivity_anaEcgFile(JNIEnv *env, jobject thiz, jstring name,
+                                                      jstring path) {
+    // TODO: implement anaEcgFile()
+}

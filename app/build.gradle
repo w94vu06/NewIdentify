@@ -8,11 +8,10 @@ android {
 
     defaultConfig {
         applicationId "com.example.newidentify"
-        minSdk 24
+        minSdk 23
         targetSdk 33
         versionCode 1
         versionName "1.0"
-
         ndkVersion "25.1.8937393"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
