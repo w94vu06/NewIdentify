@@ -7,6 +7,7 @@ import static com.example.newidentify.MainActivity.BT_Status_Text;
 import static com.example.newidentify.MainActivity.DrawChart;
 import static com.example.newidentify.MainActivity.ShowToast;
 import static com.example.newidentify.MainActivity.global_activity;
+import static com.example.newidentify.MainActivity.txt_countDown;
 //import static com.example.newidentify.LoginActivity.global_activity;
 
 import android.Manifest;
@@ -54,6 +55,9 @@ public class BT4 {
     public int datalength = 7;
     public ArrayList<Byte> Buffer_Array = new ArrayList<Byte>();
     public boolean isWave = false;
+    public boolean isActStop = false;
+
+    public boolean isSave = false;
     public ArrayList<Byte> wave_array = new ArrayList<Byte>();
 
     //傳輸檔案使用
@@ -563,7 +567,7 @@ public class BT4 {
                 public void run() {
                     Log.d(bluetooth_Tag, "已成功送出7次停止");
                     read_handler.sendMessage(new Message());
-
+                    isActStop = true;
                 }
             }, 3000);
         } catch (Exception e) {
@@ -577,6 +581,7 @@ public class BT4 {
         try {
             Log.d("wwwww", "SSS11111");
             isWave = true;
+            isActStop = false;
             final String[] finalTimeNow = {""};
             byte[] outBuf = {-86, 0x10, 0x00, 0x02, 0, 0, -68};
             if (isRecord) {
@@ -599,24 +604,6 @@ public class BT4 {
                             int stoph = 1;
 
                             Log.d("wwwww", "SSS33333");
-
-//                            int countdown = 30; // 倒计时秒数
-//                            while (isWave && countdown > 0) {
-//                                // 更新倒计时的TextView
-//                                final int finalCountdown = countdown;
-//                                global_activity.runOnUiThread(new Runnable() {
-//                                    @Override
-//                                    public void run() {
-//                                        MainActivity.txt_countDown.setText(finalCountdown + " 秒");
-//                                    }
-//                                });
-//                                SystemClock.sleep(1000); // 每秒等待
-//                                countdown--;
-//                            }
-//
-//                            if (isWave) {
-//                                StopMeasure(new Handler());
-//                            }
 
                             while (isWave) {
                                 try {
@@ -720,14 +707,13 @@ public class BT4 {
                 global_activity.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-//                        Percent_Text.setText((file_data.size() * 100 / File_Count) + " %");
-//                        if(global_measuring_compoment != null)
-//                            global_measuring_compoment.timer_text.setText((file_data.size()*100/File_Count) + " %");
+                        txt_countDown.setText((file_data.size() * 100 / File_Count) + " %");
                     }
                 });
 
                 if (file_data.size() == File_Count) {
                     read_handler.sendMessage(new Message());
+                    isSave = true;
                 } else {
                     ReadData(read_handler);
                 }
@@ -769,6 +755,7 @@ public class BT4 {
         Log.d(bluetooth_Tag, "CloseCloseCloseCloseAAA");
         alreadyscan = false;
         isWave = false;
+        isSave = false;
         if (mBluetoothAdapter != null) {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }

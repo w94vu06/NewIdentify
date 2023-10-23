@@ -23,7 +23,7 @@ public class BeginActivity extends AppCompatActivity {
         btn_login.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                it.setClass(BeginActivity.this, MainActivity.class);
+                it.setClass(BeginActivity.this, LoginActivity.class);
                 startActivity(it);
             }
         });
