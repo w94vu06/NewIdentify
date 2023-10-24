@@ -180,8 +180,7 @@ public class MainActivity extends AppCompatActivity {
                 //找外部儲存
                 String externalStorageDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
                 chooserDialog = new ChooserDialog(MainActivity.this)
-                        .withStartFile("/storage/emulated/0/")
-//                        .withStartFile(externalStorageDirectory)
+                        .withStartFile(externalStorageDirectory)
                         .withOnCancelListener(new DialogInterface.OnCancelListener() {
                             @Override
                             public void onCancel(DialogInterface dialogInterface) {
@@ -317,8 +316,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    ;
-
     private void getValue() {//算各項數值的平均值
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             averageHR = heartRate.stream().mapToDouble(Double::valueOf).average().getAsDouble();
@@ -438,8 +435,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void saveInfoToPreference() {
 
-
-
+        tinyDB.putInt("count",count);
 
         // 儲存Map
         Gson gson = new Gson();
@@ -792,7 +788,7 @@ public class MainActivity extends AppCompatActivity {
         chartSet1.setDrawFilled(true);
     }
 
-    public native int anaEcgFile(String name, String path);
+    public static native int anaEcgFile(String name, String path);
 
     public native int decpEcgFile(String path);
 }

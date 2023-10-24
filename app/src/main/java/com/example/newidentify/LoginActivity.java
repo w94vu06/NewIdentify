@@ -5,7 +5,6 @@ import static java.lang.Math.abs;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -17,7 +16,6 @@ import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -45,11 +43,8 @@ import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 public class LoginActivity extends AppCompatActivity {
     private SharedPreferences preferences;
@@ -67,6 +62,9 @@ public class LoginActivity extends AppCompatActivity {
     private int count;
     private Boolean checkX;
     private ChooserDialog chooserDialog; //檔案選擇器
+    /**
+     * 辨識所需的變數
+     */
     private Map<String, String> dataMap = new HashMap<>();
     private ArrayList<Double> heartRate = new ArrayList<>();
     private ArrayList<Double> PI = new ArrayList<>();
@@ -79,8 +77,6 @@ public class LoginActivity extends AppCompatActivity {
 
     boolean isCountDownRunning = false;
     identifyPlan identifyPlan = new identifyPlan();
-
-    boolean fromLogin = false;
 
     // Used to load the 'newidentify' library on application startup.
     static {
@@ -124,35 +120,30 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login_page);
-
         preferences = getSharedPreferences("my_preferences", MODE_PRIVATE);
         editor = preferences.edit();
-
-        BT_Status_Text = findViewById(R.id.textView);
-//        BT_Power_Text = findViewById(R.id.textView4);
         global_activity = this;
         tinyDB = new TinyDB(this);
-        chart1 = findViewById(R.id.linechart);
 
-        initchart();
-        initParameter();
+        initObject();
         initPermission();
+        initchart();
+        loadData();
         bt4.Bluetooth_init();
 
-        loadData();
     }
 
-    private void initParameter() {
+    private void initObject() {
         btn_detect = findViewById(R.id.btn_detect);
         btn_stop = findViewById(R.id.btn_stop);
         btn_choose = findViewById(R.id.btn_choose);
-//        btn_identify = findViewById(R.id.btn_identify);
         txt_file = findViewById(R.id.txt_file);
         txt_result = findViewById(R.id.txt_result);
         txt_value = findViewById(R.id.txt_value);
         txt_count = findViewById(R.id.txt_count);
         txt_countDown = findViewById(R.id.txt_countDown);
-
+        BT_Status_Text = findViewById(R.id.textView);
+        chart1 = findViewById(R.id.linechart);
 
         try {
             File file = new File(filePath);
@@ -206,9 +197,6 @@ public class LoginActivity extends AppCompatActivity {
                                 txt_file.setText(fileName);
 
                                 initCheck();
-                                if (fromLogin) {
-                                    judgeValue();
-                                }
                             }
                         })
                         .withOnBackPressedListener(dialog -> chooserDialog.goBack())
@@ -255,7 +243,7 @@ public class LoginActivity extends AppCompatActivity {
      * 執行c++檔
      **/
     private void initIdentify() {
-        int x = anaEcgFile(fileName, path);
+        int x = MainActivity.anaEcgFile(fileName, path);
         if (x == 1) {
             txt_result.setText("檔案訊號error，請換個檔案繼續");
         } else {
@@ -292,15 +280,14 @@ public class LoginActivity extends AppCompatActivity {
                     CVI.add(ValueCvi);
                     C1a.add(ValueC1a);
                     getValue();
-                } else if (heartRate.size() == dataCollectionLimit) {
-                    if (!fromLogin) {
-                        ShowToast("註冊成功...");
-                        signUpDialog();
-                    }
+                }
+                if (heartRate.size() > dataCollectionLimit) {
+                   judgeValue();
                 }
                 String s = String.format("HR: %s \n PI: %s \n CVI: %s \n C1a: %s", heartRate.toString(), PI.toString(), CVI.toString(), C1a.toString());
                 Log.d("getListSize", String.valueOf(heartRate.size()));
                 Log.d("ListValue", s);
+
                 if (ans != null) {
                     txt_result.setText(ans);
                 } else {
@@ -354,9 +341,7 @@ public class LoginActivity extends AppCompatActivity {
                 CVI.set(count % dataCollectionLimit - 1, ValueCvi);
                 C1a.set(count % dataCollectionLimit - 1, ValueC1a);
             } else {
-                if (fromLogin) {
-                    newDialog();
-                }
+                newDialog();
             }
         } catch (Exception e) {
             Log.e("super", e.toString());
@@ -406,10 +391,11 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     public void loadData() {
-        ArrayList<Double> heartRate = tinyDB.getListDouble("heartRate");
-        ArrayList<Double> PI = tinyDB.getListDouble("PI");
-        ArrayList<Double> CVI = tinyDB.getListDouble("CVI");
-        ArrayList<Double> C1a = tinyDB.getListDouble("C1a");
+        count = tinyDB.getInt("count");
+        ArrayList<Double> heartRateList = tinyDB.getListDouble("heartRate");
+        ArrayList<Double> PIList = tinyDB.getListDouble("PI");
+        ArrayList<Double> CVIList = tinyDB.getListDouble("CVI");
+        ArrayList<Double> C1aList = tinyDB.getListDouble("C1a");
 
         // 加载Map
         String dataMapJson = preferences.getString("dataMap", null);
@@ -417,8 +403,13 @@ public class LoginActivity extends AppCompatActivity {
             Gson gson = new Gson();
             Type type = new TypeToken<Map<String, String>>() {
             }.getType();
-            Map<String, String> dataMap = gson.fromJson(dataMapJson, type);
+            dataMap = gson.fromJson(dataMapJson, type);
         }
+
+        heartRate.addAll(heartRateList);
+        PI.addAll(PIList);
+        CVI.addAll(CVIList);
+        C1a.addAll(C1aList);
 
         averageHR = preferences.getFloat("averageHR", 0);
         averagePI = preferences.getFloat("averagePI", 0);
@@ -434,28 +425,185 @@ public class LoginActivity extends AppCompatActivity {
         ValuePI = preferences.getFloat("ValuePI", 0);
         ValueCvi = preferences.getFloat("ValueCvi", 0);
         ValueC1a = preferences.getFloat("ValueC1a", 0);
-
     }
 
-    private void signUpDialog() {
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(LoginActivity.this);
-        alertDialog.setTitle("是否回到登入頁面？");
-        alertDialog.setPositiveButton("是", (dialog, which) -> {
-            // 跳轉到 MainActivity
-            dialog.dismiss();
-            fromLogin = true;
-//            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
-//            startActivity(intent);
-//            finish();
-        });
-        alertDialog.setNegativeButton("否", (dialog, which) -> {
-            dialog.dismiss();
-        });
-        AlertDialog dialog = alertDialog.create();
-        dialog.show();
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 350) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("wwwww", "搜尋設備");
+            } else {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        350
+                );
+            }
+        }
+    }
 
-        dialog.setCancelable(false);
-        dialog.setCanceledOnTouchOutside(false);
+    @SuppressLint("HandlerLeak")
+    public void startWave(View view) {
+        bt4.Bluetooth_init();
+        if (bt4.isconnect) {
+            bt4.WhenConnectBLE(new Handler() {
+                @Override
+                public void handleMessage(Message msg2) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+//                            BT_Power_Text.setText(bt4.Battery_Percent + "%");
+                        }
+                    });
+                }
+            });
+
+            bt4.Wave(true, new Handler());
+
+            if (!isCountDownRunning) {
+                new CountDownTimer(5000, 1000) { // 30秒的倒數計時，每秒觸發一次onTick
+                    public void onTick(long millisUntilFinished) {
+                        // 每次倒數計時觸發的操作，這裡可以更新UI以顯示剩餘時間
+                        txt_countDown.setText(millisUntilFinished / 1000 + "");
+                    }
+
+                    public void onFinish() {
+                        // 倒數結束後執行的操作
+                        txt_countDown.setText("30");
+                        stopWave();
+                        isCountDownRunning = false;
+                    }
+                }.start();
+                isCountDownRunning = true;
+            }
+        }
+    }
+
+    @SuppressLint("HandlerLeak")
+    public void stopWave() {
+        ShowToast("正在停止跑波...");
+        bt4.StopMeasure(new Handler() {
+            @Override
+            public void handleMessage(Message msg2) {
+                ShowToast("完成停止跑波");
+                final int[] step = {0};
+                bt4.Record_Size(new Handler() {
+                    @Override
+                    public void handleMessage(Message msg) {
+
+                        if (step[0] == 0) {
+                            Log.d("wwwww", "讀取檔案大小");
+
+                            bt4.File_Size(this);
+                        }
+
+                        if (step[0] == 1) {
+                            Log.d("wwwww", "打開檔案");
+
+                            bt4.Open_File(this);
+                        }
+
+                        if (step[0] == 2) {
+                            Log.d("wwwww", "讀取檔案");
+                            bt4.ReadData(this);
+                        }
+
+                        if (step[0] == 3) {
+                            saveLP4(bt4.file_data);
+                        }
+                        step[0]++;
+                    }
+                });
+            }
+        });
+    }
+
+    private void saveLP4(ArrayList<Byte> file_data) {
+        new Thread(() -> {
+            String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(System.currentTimeMillis());
+            String folderName = "Revlis_ID_Detect"; // 資料夾名稱
+            String s = "[" + date + "]revlis.lp4";
+
+            try {
+                File folder = new File(Environment.getExternalStorageDirectory(), folderName);
+
+                // 如果資料夾不存在，建立
+                if (!folder.exists()) {
+                    folder.mkdirs();
+                }
+
+                File fileLocation = new File(folder, s);
+                FileOutputStream fos = new FileOutputStream(fileLocation);
+                byte[] lp4Text = new byte[file_data.size()];
+                for (int i = 0; i < file_data.size(); i++) {
+                    lp4Text[i] = file_data.get(i);
+                }
+                fos.write(lp4Text);
+                fos.close();
+
+                MediaScannerConnection.scanFile(this, new String[]{fileLocation.getAbsolutePath()}, null, null);
+                String savedFilePath = fileLocation.getAbsolutePath();
+                ShowToast("檔案已儲存");
+
+                setChooseFile(savedFilePath);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    public void setChooseFile(String path) {
+        File file = new File(path);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                autoDetect(path, file);
+            }
+        });
+    }
+
+    public void autoDetect(String dir, File dirFile) {
+        filePath = dir;
+        File file = new File(dir);
+        fileName = file.getName();
+        path = filePath.substring(0, filePath.length() - fileName.length());
+        txt_file.setText(fileName);
+
+        initCheck();
+    }
+
+    public void initchart() {
+        //圖表設定2（開始頁）
+        chart1.setData(new LineData());
+        chart1.getXAxis().setValueFormatter(null);
+        chart1.getXAxis().setDrawLabels(false);
+        chart1.getXAxis().setDrawGridLines(false);
+        chart1.getAxisLeft().setDrawGridLines(false);
+        chart1.getAxisLeft().setDrawAxisLine(false);
+        chart1.getAxisLeft().setGranularityEnabled(false);
+        chart1.getXAxis().setDrawAxisLine(false);
+        chart1.getAxisLeft().setDrawLabels(false);
+        chart1.getAxisLeft().setAxisMinimum(1500);
+        chart1.getAxisLeft().setAxisMaximum(2500);
+        chart1.setScaleEnabled(false);
+        chart1.setScaleXEnabled(true);
+        chart1.getXAxis().setAxisMinimum(0);
+        chart1.getXAxis().setAxisMaximum(300);
+        chart1.getXAxis().setGranularity(30);
+        chart1.getAxisLeft().setGranularity(250);
+        chart1.getAxisRight().setDrawLabels(false);
+        chart1.getAxisRight().setDrawGridLines(false);
+        chart1.getAxisRight().setDrawAxisLine(false);
+        chart1.getDescription().setText("");
+        chart1.getLegend().setEnabled(false);
+        chartSet1.setColor(Color.BLACK);
+        chartSet1.setDrawCircles(false);
+        chartSet1.setDrawFilled(false);
+        chartSet1.setFillAlpha(0);
+        chartSet1.setCircleRadius(0);
+        chartSet1.setLineWidth((float) 1.5);
+        chartSet1.setDrawValues(false);
+        chartSet1.setDrawFilled(true);
     }
 
     public static void DrawChart(byte[] result) {
@@ -581,22 +729,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 350) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("wwwww", "搜尋設備");
-            } else {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        350
-                );
-
-            }
-        }
-    }
-
     public static void ShowToast(final String message) {
         global_activity.runOnUiThread(new Runnable() {
             @Override
@@ -606,187 +738,6 @@ public class LoginActivity extends AppCompatActivity {
         });
     }//ShowToast
 
-    @SuppressLint("HandlerLeak")
-    public void RecordWaveAction(View view) {
-        bt4.Bluetooth_init();
-        if (bt4.isconnect) {
-            bt4.WhenConnectBLE(new Handler() {
-                @Override
-                public void handleMessage(Message msg2) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-//                            BT_Power_Text.setText(bt4.Battery_Percent + "%");
-                        }
-                    });
-                }
-            });
-
-            bt4.Wave(true, new Handler());
-
-            if (!isCountDownRunning) {
-                new CountDownTimer(5000, 1000) { // 30秒的倒數計時，每秒觸發一次onTick
-                    public void onTick(long millisUntilFinished) {
-                        // 每次倒數計時觸發的操作，這裡可以更新UI以顯示剩餘時間
-                        txt_countDown.setText(millisUntilFinished / 1000 + "");
-                    }
-
-                    public void onFinish() {
-                        // 倒數結束後執行的操作
-                        txt_countDown.setText("30");
-                        stopWave();
-                        isCountDownRunning = false;
-                    }
-                }.start();
-                isCountDownRunning = true;
-            }
-        }
-    }
-
-    @SuppressLint("HandlerLeak")
-    public void stopWave() {
-        ShowToast("正在停止跑波...");
-        bt4.StopMeasure(new Handler() {
-            @Override
-            public void handleMessage(Message msg2) {
-                ShowToast("完成停止跑波");
-                final int[] step = {0};
-                bt4.Record_Size(new Handler() {
-                    @Override
-                    public void handleMessage(Message msg) {
-
-                        if (step[0] == 0) {
-                            Log.d("wwwww", "讀取檔案大小");
-
-                            bt4.File_Size(this);
-                        }
-
-                        if (step[0] == 1) {
-                            Log.d("wwwww", "打開檔案");
-
-                            bt4.Open_File(this);
-                        }
-
-                        if (step[0] == 2) {
-                            Log.d("wwwww", "讀取檔案");
-                            bt4.ReadData(this);
-                        }
-
-                        if (step[0] == 3) {
-                            saveLP4(bt4.file_data);
-                        }
-                        step[0]++;
-                    }
-                });
-            }
-        });
-    }
-
-
-    private void saveLP4(ArrayList<Byte> file_data) {
-        new Thread(() -> {
-            String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(System.currentTimeMillis());
-            String folderName = "Revlis_ID_Detect"; // 資料夾名稱
-            String s = "[" + date + "]revlis.lp4";
-
-            try {
-                File folder = new File(Environment.getExternalStorageDirectory(), folderName);
-
-                // 如果資料夾不存在，建立
-                if (!folder.exists()) {
-                    folder.mkdirs();
-                }
-
-                File fileLocation = new File(folder, s);
-                FileOutputStream fos = new FileOutputStream(fileLocation);
-                byte[] lp4Text = new byte[file_data.size()];
-                for (int i = 0; i < file_data.size(); i++) {
-                    lp4Text[i] = file_data.get(i);
-                }
-                fos.write(lp4Text);
-                fos.close();
-
-                MediaScannerConnection.scanFile(this, new String[]{fileLocation.getAbsolutePath()}, null, null);
-                String savedFilePath = fileLocation.getAbsolutePath();
-                ShowToast("檔案已儲存");
-
-                setChooseFile(savedFilePath);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
-    public void setChooseFile(String path) {
-        File file = new File(path);
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                autoDetect(path, file);
-            }
-        });
-    }
-
-    public void autoDetect(String dir, File dirFile) {
-        filePath = dir;
-        File file = new File(dir);
-        fileName = file.getName();
-        path = filePath.substring(0, filePath.length() - fileName.length());
-        txt_file.setText(fileName);
-
-        Log.d("tttt", "fileName: " + fileName);
-        Log.d("tttt", "filePath: " + filePath);
-        Log.d("tttt", "path: " + path);
-        Log.d("tttt", "fromLogin: " + fromLogin);
-
-        initCheck();
-    }
-
-    public static String encodeFileToBase64Binary(ArrayList<Byte> datalist) {
-        byte[] bytes = new byte[datalist.size()];
-        for (int i = 0; i < bytes.length; i++) {
-            bytes[i] = (byte) datalist.get(i);
-        }
-        return Base64.encodeToString(bytes, Base64.DEFAULT);
-    }
-
-    public void initchart() {
-
-        chart1.clear();
-        //圖表設定2（開始頁）
-        chart1.setData(new LineData());
-        chart1.getXAxis().setValueFormatter(null);
-        chart1.getXAxis().setDrawLabels(false);
-        chart1.getXAxis().setDrawGridLines(false);
-        chart1.getAxisLeft().setDrawGridLines(false);
-        chart1.getAxisLeft().setDrawAxisLine(false);
-        chart1.getAxisLeft().setGranularityEnabled(false);
-        chart1.getXAxis().setDrawAxisLine(false);
-        chart1.getAxisLeft().setDrawLabels(false);
-        chart1.getAxisLeft().setAxisMinimum(1500);
-        chart1.getAxisLeft().setAxisMaximum(2500);
-        chart1.setScaleEnabled(false);
-        chart1.setScaleXEnabled(true);
-        chart1.getXAxis().setAxisMinimum(0);
-        chart1.getXAxis().setAxisMaximum(300);
-        chart1.getXAxis().setGranularity(30);
-        chart1.getAxisLeft().setGranularity(250);
-        chart1.getAxisRight().setDrawLabels(false);
-        chart1.getAxisRight().setDrawGridLines(false);
-        chart1.getAxisRight().setDrawAxisLine(false);
-        chart1.getDescription().setText("");
-        chart1.getLegend().setEnabled(false);
-        chartSet1.setColor(Color.BLACK);
-        chartSet1.setDrawCircles(false);
-        chartSet1.setDrawFilled(false);
-        chartSet1.setFillAlpha(0);
-        chartSet1.setCircleRadius(0);
-        chartSet1.setLineWidth((float) 1.5);
-        chartSet1.setDrawValues(false);
-        chartSet1.setDrawFilled(true);
-    }
-
     public native int anaEcgFile(String name, String path);
-
     public native int decpEcgFile(String path);
 }
