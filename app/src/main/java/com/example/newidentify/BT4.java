@@ -80,6 +80,7 @@ public class BT4 {
     //判斷是否連線
     public boolean isconnect = false;
     public boolean alreadyscan = false;
+    public boolean isTenSec = false;
 
     //BLE
     BluetoothGattCharacteristic gattCharacteristic_char6;
@@ -600,80 +601,80 @@ public class BT4 {
                             Log.d("wwwww", "SSS33333");
 
                             while (isWave) {
-                                if (continueWave) {
-                                    try {
-                                        //是否有遺漏封包，有遺漏就不畫
-                                        while (true) {
-                                            if (Buffer_Array.size() > 0) {
-                                                if (Buffer_Array.get(0) == null) {
-                                                    Buffer_Array.remove(0);
-                                                } else if (Buffer_Array.get(0) == -86) {
-                                                    break;
-                                                } else {
-                                                    Buffer_Array.remove(0);
-                                                }
-                                            } else {
+
+                                try {
+                                    //是否有遺漏封包，有遺漏就不畫
+                                    while (true) {
+                                        if (Buffer_Array.size() > 0) {
+                                            if (Buffer_Array.get(0) == null) {
+                                                Buffer_Array.remove(0);
+                                            } else if (Buffer_Array.get(0) == -86) {
                                                 break;
+                                            } else {
+                                                Buffer_Array.remove(0);
+                                            }
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    if (Buffer_Array.size() >= 7) {
+                                        boolean isnull = false;
+                                        //是否有遺漏封包，有遺漏就不畫
+                                        for (int i = 0; i < 7; i++) {
+                                            if (Buffer_Array.get(i) == null) {
+                                                isnull = true;
                                             }
                                         }
-                                        if (Buffer_Array.size() >= 7) {
-                                            boolean isnull = false;
-                                            //是否有遺漏封包，有遺漏就不畫
+                                        if (isnull) {
                                             for (int i = 0; i < 7; i++) {
-                                                if (Buffer_Array.get(i) == null) {
-                                                    isnull = true;
-                                                }
+                                                Buffer_Array.remove(0);
                                             }
-                                            if (isnull) {
-                                                for (int i = 0; i < 7; i++) {
-                                                    Buffer_Array.remove(0);
-                                                }
-                                            } else {
+                                        } else {
 //                                            Log.d("wwwww", "Not NULL  畫圖");
-                                                String result = "";
-                                                for (int i = 0; i < 7; i++) {
-                                                    result += "  " + Integer.toString((Buffer_Array.get(0) & 0xff) + 0x100, 16).substring(1);
-                                                    wave_array.add(Buffer_Array.get(0));
-                                                    Buffer_Array.remove(0);
-                                                }
+                                            String result = "";
+                                            for (int i = 0; i < 7; i++) {
+                                                result += "  " + Integer.toString((Buffer_Array.get(0) & 0xff) + 0x100, 16).substring(1);
+                                                wave_array.add(Buffer_Array.get(0));
+                                                Buffer_Array.remove(0);
+                                            }
 //                                            Log.d("wwwww", "result = " + result);
 
-                                                if (wave_array.size() >= 7) {
-                                                    Log.d(bluetooth_Tag, "wave_array = " + wave_array.size() + "     bytesAvailable = " + Buffer_Array.size());
-                                                    byte[] ecgbyte = new byte[7];
-                                                    ecgbyte[0] = wave_array.get(0);
-                                                    ecgbyte[1] = wave_array.get(1);
-                                                    ecgbyte[2] = wave_array.get(2);
-                                                    ecgbyte[3] = wave_array.get(3);
-                                                    ecgbyte[4] = wave_array.get(4);
-                                                    ecgbyte[5] = wave_array.get(5);
-                                                    ecgbyte[6] = wave_array.get(6);
-                                                    String valid = Integer.toString((wave_array.get(0) & 0xff) + 0x100, 16).substring(1) + "" + Integer.toString((wave_array.get(1) & 0xff) + 0x100, 16).substring(1);
+                                            if (wave_array.size() >= 7) {
+                                                Log.d(bluetooth_Tag, "wave_array = " + wave_array.size() + "     bytesAvailable = " + Buffer_Array.size());
+                                                byte[] ecgbyte = new byte[7];
+                                                ecgbyte[0] = wave_array.get(0);
+                                                ecgbyte[1] = wave_array.get(1);
+                                                ecgbyte[2] = wave_array.get(2);
+                                                ecgbyte[3] = wave_array.get(3);
+                                                ecgbyte[4] = wave_array.get(4);
+                                                ecgbyte[5] = wave_array.get(5);
+                                                ecgbyte[6] = wave_array.get(6);
+                                                String valid = Integer.toString((wave_array.get(0) & 0xff) + 0x100, 16).substring(1) + "" + Integer.toString((wave_array.get(1) & 0xff) + 0x100, 16).substring(1);
 
-                                                    wave_array.remove(0);
-                                                    wave_array.remove(0);
-                                                    wave_array.remove(0);
-                                                    wave_array.remove(0);
-                                                    wave_array.remove(0);
-                                                    wave_array.remove(0);
-                                                    wave_array.remove(0);
+                                                wave_array.remove(0);
+                                                wave_array.remove(0);
+                                                wave_array.remove(0);
+                                                wave_array.remove(0);
+                                                wave_array.remove(0);
+                                                wave_array.remove(0);
+                                                wave_array.remove(0);
 
-                                                    if (valid.equals("aaa0")) {
-                                                        DrawChart(ecgbyte);
-                                                        DrawChart1(ecgbyte);
-                                                        Log.d("ssss", "run: "+ecgbyte.toString());
+                                                if (valid.equals("aaa0") && isTenSec) {
+                                                    DrawChart(ecgbyte);
+                                                    DrawChart1(ecgbyte);
+                                                    Log.d("ssss", "run: " + ecgbyte.toString());
 //                                                    Log.d("wwwww", "畫圖");
-                                                    }
                                                 }
                                             }
                                         }
-                                    }//try
-                                    catch (Exception e) {
-                                        Log.d(bluetooth_Tag, "exxxxx = " + e.toString());
-                                        e.printStackTrace();
                                     }
-                                    SystemClock.sleep(10);
+                                }//try
+                                catch (Exception e) {
+                                    Log.d(bluetooth_Tag, "exxxxx = " + e.toString());
+                                    e.printStackTrace();
                                 }
+                                SystemClock.sleep(10);
+
 
                             }//while
                             Log.d(bluetooth_Tag, "EXIT = ");
@@ -700,6 +701,7 @@ public class BT4 {
                 for (int i = 2; i < 514; i++) {
                     if (file_data.size() < File_Count) {
                         file_data.add(Buffer_Array.get(i));
+                        Log.d("bbbb", "handleMessage: " + Buffer_Array.get(i));
                     }
                 }
 

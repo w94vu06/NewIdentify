@@ -62,10 +62,11 @@ public class MainActivity extends AppCompatActivity {
     Button btn_choose, btn_detect, btn_stop;
     TextView txt_file, txt_result, txt_value, txt_count;
 
+
     /**
      * Parameter
      **/
-    private String path, filePath, fileName, ans;
+    private String path, filePath, fileName, ans, readTxt;
     private int dataCollectionLimit = 5;//設定檔案收集數量，最高20
     private int count;
     private Boolean checkX;
@@ -289,7 +290,7 @@ public class MainActivity extends AppCompatActivity {
                 String externalStorageDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
 //                String externalStorageDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath();
                 chooserDialog = new ChooserDialog(MainActivity.this)
-                        .withStartFile(String.valueOf(externalStorageDirectory+"/Apple_ID_Detect"))
+                        .withStartFile(String.valueOf(externalStorageDirectory + "/Apple_ID_Detect"))
                         .withOnCancelListener(new DialogInterface.OnCancelListener() {
                             @Override
                             public void onCancel(DialogInterface dialogInterface) {
@@ -368,9 +369,10 @@ public class MainActivity extends AppCompatActivity {
                 BufferedReader reader = new BufferedReader(new FileReader(file));
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    txt_result.setText(line);
+//                    txt_result.setText(line);
+                    readTxt = line;
                 }
-                line = txt_result.getText().toString();
+                line = readTxt;
                 String[] parts = line.split(",");
 
                 for (String part : parts) {
@@ -385,12 +387,17 @@ public class MainActivity extends AppCompatActivity {
                 ValuePI = Double.parseDouble(dataMap.get("PI"));
                 ValueCvi = Double.parseDouble(dataMap.get("CVI"));
                 ValueC1a = Double.parseDouble(dataMap.get("C1a"));
-                if (heartRate.size() < dataCollectionLimit) {//如果數據數小於dataCollectionLimit就繼續收集
-                    heartRate.add(ValueHR);//把LP4算好的結果加進List
-                    PI.add(ValuePI);
-                    CVI.add(ValueCvi);
-                    C1a.add(ValueC1a);
-                    getValue();
+                if (ValueHR > 50 && ValueHR < 150) {
+                    if (heartRate.size() < dataCollectionLimit) {//如果數據數小於dataCollectionLimit就繼續收集
+                        heartRate.add(ValueHR);//把LP4算好的結果加進List
+                        PI.add(ValuePI);
+                        CVI.add(ValueCvi);
+                        C1a.add(ValueC1a);
+                        getValue();
+                    }
+                } else {
+                    count -= 1;
+                    ShowToast("訊號品質不好，請重新量測");
                 }
                 if (heartRate.size() == dataCollectionLimit) {
                     runOnUiThread(new Runnable() {
@@ -412,10 +419,11 @@ public class MainActivity extends AppCompatActivity {
                     txt_result.setText("檔案數量不足");
                 }
                 txt_value.setText(s);
-                txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, count));
+                txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, heartRate.size()));
                 reader.close();
             }
         } catch (Exception e) {
+            ShowToast("訊號品質不好，請重新量測");
             Log.e("catchError", e.toString());
         }
     }
@@ -600,16 +608,18 @@ public class MainActivity extends AppCompatActivity {
                         nvalue = Butterworth(oldValue);
                     }
                     Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
-                    chartSet1Entries.add(chartSet1Entrie);
-                    chartSet1.setValues(chartSet1Entries);
-                    lineChart.setData(new LineData(chartSet1));
-                    lineChart.setVisibleXRangeMinimum(300);
-                    lineChart.invalidate();
+                    if (bt4.isTenSec) {
+                        chartSet1Entries.add(chartSet1Entrie);
+                        chartSet1.setValues(chartSet1Entries);
+                        lineChart.setData(new LineData(chartSet1));
+                        lineChart.setVisibleXRangeMinimum(300);
+                        lineChart.invalidate();
+                    }
 
                     for (Entry entry : chartSet1Entries) {
                         float xValue = entry.getX();
                         float yValue = entry.getY();
-                        Log.d("ssss", "run: "+yValue);
+                        Log.d("ssss", "run: " + yValue);
                     }
 
                 }
@@ -743,7 +753,7 @@ public class MainActivity extends AppCompatActivity {
         isCountDownRunning = true;
         isDetectOver = false;
         countDownHandler.postDelayed(new Runnable() {
-            private int presetTime = 6000;
+            private int presetTime = 10000;
             private int remainingTime = COUNTDOWN_TOTAL_TIME;
 
             @Override
@@ -753,7 +763,7 @@ public class MainActivity extends AppCompatActivity {
                     isToastShown = true;
                 }
                 if (presetTime <= 0) {//倒數6秒結束才開始跑波
-                    bt4.continueWave = true;
+                    bt4.isTenSec = true;
                     if (remainingTime <= 0) {//結束的動作
                         txt_countDown.setText("30");
                         stopWave();
@@ -765,7 +775,7 @@ public class MainActivity extends AppCompatActivity {
                         countDownHandler.postDelayed(this, COUNTDOWN_INTERVAL);
                     }
                 } else {
-                    bt4.continueWave = false;
+                    bt4.isTenSec = false;
                     txt_countDown.setText(String.valueOf(presetTime / 1000));
                     presetTime -= COUNTDOWN_INTERVAL;
                     countDownHandler.postDelayed(this, COUNTDOWN_INTERVAL);
@@ -864,7 +874,7 @@ public class MainActivity extends AppCompatActivity {
                 MediaScannerConnection.scanFile(this, new String[]{fileLocation.getAbsolutePath()}, null, null);
                 String savedFilePath = fileLocation.getAbsolutePath();
                 ShowToast("檔案已儲存");
-                Log.d("gggg", "saveLP4: "+savedFilePath);
+                Log.d("gggg", "saveLP4: " + savedFilePath);
                 setChooseFile(savedFilePath);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -898,7 +908,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
     }
-
 
 
     public void initchart() {

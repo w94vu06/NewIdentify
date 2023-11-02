@@ -577,7 +577,7 @@ public class LoginActivity extends AppCompatActivity {
         isCountDownRunning = true;
         isDetectOver = false;
         countDownHandler.postDelayed(new Runnable() {
-            private int presetTime = 6000;
+            private int presetTime = 10000;
             private int remainingTime = COUNTDOWN_TOTAL_TIME;
 
             @Override
@@ -587,7 +587,7 @@ public class LoginActivity extends AppCompatActivity {
                     isToastShown = true;
                 }
                 if (presetTime <= 0) {//倒數6秒結束才開始跑波
-                    bt4.continueWave = true;
+                    bt4.isTenSec = true;
                     if (remainingTime <= 0) {//結束的動作
                         txt_countDown.setText("30");
                         stopWave();
@@ -599,10 +599,11 @@ public class LoginActivity extends AppCompatActivity {
                         countDownHandler.postDelayed(this, COUNTDOWN_INTERVAL);
                     }
                 } else {
-                    bt4.continueWave = false;
+                    bt4.isTenSec = false;
                     txt_countDown.setText(String.valueOf(presetTime / 1000));
                     presetTime -= COUNTDOWN_INTERVAL;
                     countDownHandler.postDelayed(this, COUNTDOWN_INTERVAL);
+
                 }
             }
         }, COUNTDOWN_INTERVAL);
