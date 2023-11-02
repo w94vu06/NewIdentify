@@ -2,6 +2,12 @@ package com.example.newidentify;
 
 import android.util.Log;
 
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+
+import java.util.ArrayList;
+
 public class identifyPlan {
     double aUpper,aLower,pUpper,pLower,cviUpper,cviLower,c1aUpper,c1aLower;
 
@@ -42,4 +48,5 @@ public class identifyPlan {
             return "非本人";
         }
     }
+
 }

@@ -3,15 +3,19 @@ package com.example.newidentify;
 
 import static android.content.Context.BLUETOOTH_SERVICE;
 
-import static com.example.newidentify.MainActivity.BT_Status_Text;
+//import static com.example.newidentify.MainActivity.txt_BleStatus;
+//import static com.example.newidentify.MainActivity.DrawChart;
+//import static com.example.newidentify.MainActivity.ShowToast;
+//import static com.example.newidentify.MainActivity.global_activity;
+//import static com.example.newidentify.MainActivity.txt_countDown;
+
+
+import static com.example.newidentify.LoginActivity.DrawChart1;
 import static com.example.newidentify.MainActivity.DrawChart;
-import static com.example.newidentify.MainActivity.ShowToast;
-import static com.example.newidentify.MainActivity.global_activity;
-import static com.example.newidentify.MainActivity.txt_countDown;
-//import static com.example.newidentify.LoginActivity.global_activity;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -45,7 +49,18 @@ import java.util.UUID;
 @SuppressLint("MissingPermission")
 public class BT4 {
 
+    private final Activity global_activity;
+
+    public BT4(Activity activity) {
+        this.global_activity = activity;
+    }
+
     public String bluetooth_Tag = "wwwww";
+
+    public final static String BLE_CONNECTED = "BLE_CONNECTED";
+    public final static String BLE_TRY_CONNECT = "BLE_TRY_CONNECT";
+    public final static String BLE_DISCONNECTED = "BLE_DISCONNECTED";
+    public final static String BLE_READ_FILE = "BLE_READ_FILE";
 
     public static UUID CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     public static String UUID_Notify = "49535343-1e4d-4bd9-ba61-23c647249616";
@@ -55,9 +70,7 @@ public class BT4 {
     public int datalength = 7;
     public ArrayList<Byte> Buffer_Array = new ArrayList<Byte>();
     public boolean isWave = false;
-    public boolean isActStop = false;
-
-    public boolean isSave = false;
+    public boolean continueWave = false;
     public ArrayList<Byte> wave_array = new ArrayList<Byte>();
 
     //傳輸檔案使用
@@ -81,6 +94,7 @@ public class BT4 {
     public int ECG_Count = 0;
     public int Battery_Percent = 0;
     public int File_Count = 0;
+
 
     public void Bluetooth_init() {
         int permission1 = ActivityCompat.checkSelfPermission(global_activity, Manifest.permission.ACCESS_FINE_LOCATION);
@@ -138,8 +152,11 @@ public class BT4 {
                         if (device.getName() != null) {
                             mBluetoothDevices.add(device);
                             if (device.getName().toString().equals("CmateH")) {
+                                String intentAction;
+                                intentAction = BLE_TRY_CONNECT;
+                                broadcastUpdate(intentAction);
                                 Log.d("xxxxx", "搜尋到裝置，連線中");
-                                ShowToast("搜尋到裝置，連線中");
+
                                 newBluetoothDevice = device;
                                 mBluetoothGatt = newBluetoothDevice.connectGatt(global_activity, false, gattCallback);
                             }
@@ -196,6 +213,7 @@ public class BT4 {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             Log.i("xxxxx", "StatusAAA: " + status);
+
             switch (newState) {
                 case BluetoothProfile.STATE_CONNECTED:
                     Log.d("xxxxx", "STATE_CONNECTED  isConnect = " + isconnect);
@@ -240,13 +258,14 @@ public class BT4 {
             mBluetoothGatt.writeDescriptor(descriptor);
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
             isconnect = true;
+            String intentAction;
+            intentAction = BLE_CONNECTED;
+            broadcastUpdate(intentAction);
             global_activity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-
                     Log.d(bluetooth_Tag, "蓝牙连接成功AAAAAAAA");
-
-                    BT_Status_Text.setText("已連線");
+//                    txt_BleStatus.setText("已連線");
 
                 }
             });
@@ -307,7 +326,7 @@ public class BT4 {
         String result = "";
         for (int i = 0; i < rawArray.length; i++)
             result += "  " + Integer.toString((rawArray[i] & 0xff) + 0x100, 16).substring(1);
-        Log.d(bluetooth_Tag, rawArray.length + "  發指令 = " + result + "");
+//        Log.d(bluetooth_Tag, rawArray.length + "  發指令 = " + result + "");
         gattCharacteristic_write.setValue(cmd);
         mBluetoothGatt.writeCharacteristic(gattCharacteristic_write);
         if (isWave) {
@@ -397,7 +416,6 @@ public class BT4 {
         });
     }
 
-
     @SuppressLint("HandlerLeak")
     public void Record_Size(final Handler read_handler) {
         try {
@@ -410,31 +428,9 @@ public class BT4 {
                 }
             });
         } catch (Exception e) {
-            ShowToast("無檔案可讀取");
         }
-
     }
 
-    @SuppressLint("HandlerLeak")
-    public void Delete_AllRecor(final Handler read_handler) {
-        ECG_Count = ECG_Count - 1;
-        if (ECG_Count < 0) {
-            read_handler.sendMessage(new Message());
-            return;
-        }
-        writeBLE(new byte[]{(byte) 0xaa, 0x26, (byte) ECG_Count, 0, 0, 0, 0}, new Handler() {
-            @Override
-            public void handleMessage(Message msg2) {
-                if (ECG_Count == 0) {
-                    read_handler.sendMessage(new Message());
-                    return;
-                }
-                if (ECG_Count > 0) {
-                    Delete_AllRecor(read_handler);
-                }
-            }
-        });
-    }
 
     public byte[] send_BTCommand(byte[] cmd) {
         //清除
@@ -448,7 +444,7 @@ public class BT4 {
         String result = "";
         for (int i = 0; i < rawArray.length; i++)
             result += "  " + Integer.toString((rawArray[i] & 0xff) + 0x100, 16).substring(1);
-        Log.d(bluetooth_Tag, rawArray.length + "  發指令 = " + result + "");
+//        Log.d(bluetooth_Tag, rawArray.length + "  發指令 = " + result + "");
         gattCharacteristic_write.setValue(cmd);
         mBluetoothGatt.writeCharacteristic(gattCharacteristic_write);
         //int wait = 350;
@@ -518,7 +514,7 @@ public class BT4 {
                 }
             });
         } catch (Exception e) {
-            ShowToast("請先讓藍芽初始化");
+//            ShowToast("請先讓藍芽初始化");
         }
 
     }
@@ -567,21 +563,19 @@ public class BT4 {
                 public void run() {
                     Log.d(bluetooth_Tag, "已成功送出7次停止");
                     read_handler.sendMessage(new Message());
-                    isActStop = true;
                 }
             }, 3000);
         } catch (Exception e) {
-            ShowToast("請先開始跑波");
+//            ShowToast("" + e);
         }
-
     }
+
 
     @SuppressLint("HandlerLeak")
     public void Wave(boolean isRecord, final Handler read_handler) {
         try {
             Log.d("wwwww", "SSS11111");
             isWave = true;
-            isActStop = false;
             final String[] finalTimeNow = {""};
             byte[] outBuf = {-86, 0x10, 0x00, 0x02, 0, 0, -68};
             if (isRecord) {
@@ -606,76 +600,81 @@ public class BT4 {
                             Log.d("wwwww", "SSS33333");
 
                             while (isWave) {
-                                try {
-                                    //是否有遺漏封包，有遺漏就不畫
-                                    while (true) {
-                                        if (Buffer_Array.size() > 0) {
-                                            if (Buffer_Array.get(0) == null) {
-                                                Buffer_Array.remove(0);
-                                            } else if (Buffer_Array.get(0) == -86) {
-                                                break;
-                                            } else {
-                                                Buffer_Array.remove(0);
-                                            }
-                                        } else {
-                                            break;
-                                        }
-                                    }
-                                    if (Buffer_Array.size() >= 7) {
-                                        boolean isnull = false;
+                                if (continueWave) {
+                                    try {
                                         //是否有遺漏封包，有遺漏就不畫
-                                        for (int i = 0; i < 7; i++) {
-                                            if (Buffer_Array.get(i) == null) {
-                                                isnull = true;
+                                        while (true) {
+                                            if (Buffer_Array.size() > 0) {
+                                                if (Buffer_Array.get(0) == null) {
+                                                    Buffer_Array.remove(0);
+                                                } else if (Buffer_Array.get(0) == -86) {
+                                                    break;
+                                                } else {
+                                                    Buffer_Array.remove(0);
+                                                }
+                                            } else {
+                                                break;
                                             }
                                         }
-                                        if (isnull) {
+                                        if (Buffer_Array.size() >= 7) {
+                                            boolean isnull = false;
+                                            //是否有遺漏封包，有遺漏就不畫
                                             for (int i = 0; i < 7; i++) {
-                                                Buffer_Array.remove(0);
+                                                if (Buffer_Array.get(i) == null) {
+                                                    isnull = true;
+                                                }
                                             }
-                                        } else {
-                                            Log.d("wwwww", "Not NULL  畫圖");
-                                            String result = "";
-                                            for (int i = 0; i < 7; i++) {
-                                                result += "  " + Integer.toString((Buffer_Array.get(0) & 0xff) + 0x100, 16).substring(1);
-                                                wave_array.add(Buffer_Array.get(0));
-                                                Buffer_Array.remove(0);
-                                            }
-                                            Log.d("wwwww", "result = " + result);
+                                            if (isnull) {
+                                                for (int i = 0; i < 7; i++) {
+                                                    Buffer_Array.remove(0);
+                                                }
+                                            } else {
+//                                            Log.d("wwwww", "Not NULL  畫圖");
+                                                String result = "";
+                                                for (int i = 0; i < 7; i++) {
+                                                    result += "  " + Integer.toString((Buffer_Array.get(0) & 0xff) + 0x100, 16).substring(1);
+                                                    wave_array.add(Buffer_Array.get(0));
+                                                    Buffer_Array.remove(0);
+                                                }
+//                                            Log.d("wwwww", "result = " + result);
 
-                                            if (wave_array.size() >= 7) {
-                                                Log.d(bluetooth_Tag, "wave_array = " + wave_array.size() + "     bytesAvailable = " + Buffer_Array.size());
-                                                byte[] ecgbyte = new byte[7];
-                                                ecgbyte[0] = wave_array.get(0);
-                                                ecgbyte[1] = wave_array.get(1);
-                                                ecgbyte[2] = wave_array.get(2);
-                                                ecgbyte[3] = wave_array.get(3);
-                                                ecgbyte[4] = wave_array.get(4);
-                                                ecgbyte[5] = wave_array.get(5);
-                                                ecgbyte[6] = wave_array.get(6);
-                                                String valid = Integer.toString((wave_array.get(0) & 0xff) + 0x100, 16).substring(1) + "" + Integer.toString((wave_array.get(1) & 0xff) + 0x100, 16).substring(1);
-                                                wave_array.remove(0);
-                                                wave_array.remove(0);
-                                                wave_array.remove(0);
-                                                wave_array.remove(0);
-                                                wave_array.remove(0);
-                                                wave_array.remove(0);
-                                                wave_array.remove(0);
+                                                if (wave_array.size() >= 7) {
+                                                    Log.d(bluetooth_Tag, "wave_array = " + wave_array.size() + "     bytesAvailable = " + Buffer_Array.size());
+                                                    byte[] ecgbyte = new byte[7];
+                                                    ecgbyte[0] = wave_array.get(0);
+                                                    ecgbyte[1] = wave_array.get(1);
+                                                    ecgbyte[2] = wave_array.get(2);
+                                                    ecgbyte[3] = wave_array.get(3);
+                                                    ecgbyte[4] = wave_array.get(4);
+                                                    ecgbyte[5] = wave_array.get(5);
+                                                    ecgbyte[6] = wave_array.get(6);
+                                                    String valid = Integer.toString((wave_array.get(0) & 0xff) + 0x100, 16).substring(1) + "" + Integer.toString((wave_array.get(1) & 0xff) + 0x100, 16).substring(1);
 
-                                                if (valid.equals("aaa0")) {
-                                                    DrawChart(ecgbyte);
-                                                    Log.d("wwwww", "畫圖");
+                                                    wave_array.remove(0);
+                                                    wave_array.remove(0);
+                                                    wave_array.remove(0);
+                                                    wave_array.remove(0);
+                                                    wave_array.remove(0);
+                                                    wave_array.remove(0);
+                                                    wave_array.remove(0);
+
+                                                    if (valid.equals("aaa0")) {
+                                                        DrawChart(ecgbyte);
+                                                        DrawChart1(ecgbyte);
+                                                        Log.d("ssss", "run: "+ecgbyte.toString());
+//                                                    Log.d("wwwww", "畫圖");
+                                                    }
                                                 }
                                             }
                                         }
+                                    }//try
+                                    catch (Exception e) {
+                                        Log.d(bluetooth_Tag, "exxxxx = " + e.toString());
+                                        e.printStackTrace();
                                     }
-
-                                }//try
-                                catch (Exception e) {
-                                    Log.d(bluetooth_Tag, "exxxxx = " + e.toString());
-                                    e.printStackTrace();
+                                    SystemClock.sleep(10);
                                 }
-                                SystemClock.sleep(10);
+
                             }//while
                             Log.d(bluetooth_Tag, "EXIT = ");
                         }
@@ -683,7 +682,7 @@ public class BT4 {
                 }
             });
         } catch (Exception e) {
-            ShowToast("請先連接裝置");
+//            ShowToast("請先連接裝置");
         }
     }
 
@@ -703,17 +702,20 @@ public class BT4 {
                         file_data.add(Buffer_Array.get(i));
                     }
                 }
+
                 Log.d(bluetooth_Tag, "Percent = " + (file_data.size() * 100 / File_Count));
                 global_activity.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        txt_countDown.setText((file_data.size() * 100 / File_Count) + " %");
+                        String intentAction;
+                        intentAction = BLE_READ_FILE;
+                        broadcastUpdate(intentAction);
+//                        txt_countDown.setText((file_data.size() * 100 / File_Count) + " %");
                     }
                 });
 
                 if (file_data.size() == File_Count) {
                     read_handler.sendMessage(new Message());
-                    isSave = true;
                 } else {
                     ReadData(read_handler);
                 }
@@ -751,20 +753,54 @@ public class BT4 {
         });
     }
 
+    @SuppressLint("HandlerLeak")
+    public void Delete_AllRecor(final Handler read_handler) {
+        ECG_Count = ECG_Count - 1;
+        if (ECG_Count < 0) {
+            read_handler.sendMessage(new Message());
+            return;
+        }
+        writeBLE(new byte[]{(byte) 0xaa, 0x26, (byte) ECG_Count, 0, 0, 0, 0}, new Handler() {
+            @Override
+            public void handleMessage(Message msg2) {
+                if (ECG_Count == 0) {
+                    read_handler.sendMessage(new Message());
+                    return;
+                }
+                if (ECG_Count > 0) {
+                    Delete_AllRecor(read_handler);
+                }
+            }
+        });
+    }
+
     public void close() {
         Log.d(bluetooth_Tag, "CloseCloseCloseCloseAAA");
         alreadyscan = false;
         isWave = false;
-        isSave = false;
         if (mBluetoothAdapter != null) {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }
+        mBluetoothGatt.disconnect();
         isconnect = false;
+
         global_activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                BT_Status_Text.setText("已斷線");
+                String intentAction;
+                intentAction = BLE_DISCONNECTED;
+                broadcastUpdate(intentAction);
+//                txt_BleStatus.setText("已斷線");
             }
         });
     }
+
+    private void broadcastUpdate(final String action) {
+        final Intent intent = new Intent(action);
+        global_activity.sendBroadcast(intent);
+    }
+
+
 }
+
+

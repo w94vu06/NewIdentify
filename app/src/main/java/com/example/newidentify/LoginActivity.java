@@ -1,11 +1,16 @@
 package com.example.newidentify;
 
+
 import static java.lang.Math.abs;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -16,8 +21,10 @@ import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +37,7 @@ import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.listener.BarLineChartTouchListener;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.obsez.android.lib.filechooser.ChooserDialog;
@@ -43,6 +51,7 @@ import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -52,8 +61,8 @@ public class LoginActivity extends AppCompatActivity {
     /**
      * UI
      **/
-    Button btn_choose, btn_detect, btn_stop;
-    TextView txt_file, txt_result, txt_value, txt_count;
+    Button btn_choose, btn_detect,btn_stop;
+    TextView txt_file, txt_result, txt_value, txt_count,textView;
     /**
      * Parameter
      **/
@@ -75,7 +84,6 @@ public class LoginActivity extends AppCompatActivity {
     double minPI, minCVI, minC1a;
     double ValueHR, ValuePI, ValueCvi, ValueC1a;
 
-    boolean isCountDownRunning = false;
     identifyPlan identifyPlan = new identifyPlan();
 
     // Used to load the 'newidentify' library on application startup.
@@ -89,16 +97,21 @@ public class LoginActivity extends AppCompatActivity {
      */
     public static Activity global_activity;
     public static TextView txt_countDown;
-
-    static BT5 bt4 = new BT5();
+    static BT4 bt4 ;
     TinyDB tinyDB;
-    public static TextView BT_Status_Text;
-    public static TextView BT_Power_Text;
-    //    public static TextView Percent_Text;
-    public static LineChart chart1;
+    public static TextView txt_BleStatus;
+    public static LineChart lineChart;
     ///////////////////////
     //////畫心電圖使用///////
     //////////////////////
+    private Handler countDownHandler = new Handler();
+    private boolean isToastShown = false;
+    public CountDownTimer countDownTimer;//倒數
+    boolean isCountDownRunning = false;
+    boolean isDetectOver = false;
+    private static final int COUNTDOWN_INTERVAL = 1000;
+    private static final int COUNTDOWN_TOTAL_TIME = 30000;
+
     public static ArrayList<Entry> chartSet1Entries = new ArrayList<Entry>();
     public static ArrayList<Double> oldValue = new ArrayList<Double>();
     public static LineDataSet chartSet1 = new LineDataSet(null, "");
@@ -123,7 +136,9 @@ public class LoginActivity extends AppCompatActivity {
         preferences = getSharedPreferences("my_preferences", MODE_PRIVATE);
         editor = preferences.edit();
         global_activity = this;
+        bt4 = new BT4(global_activity);
         tinyDB = new TinyDB(this);
+        textView = findViewById(R.id.txt_BleStatus);
 
         initObject();
         initPermission();
@@ -133,17 +148,81 @@ public class LoginActivity extends AppCompatActivity {
 
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        initChooser();
+        initBroadcast();
+        bt4.Bluetooth_init();
+        setScreenOn();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        setScreenOff();
+        Log.d("jjjj", "onStop: ");
+        if (bt4.isconnect) {
+            bt4.close();
+        }
+        unregisterReceiver(getReceiver);
+    }
+
+    private void initBroadcast() {
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BT4.BLE_CONNECTED);
+        intentFilter.addAction(BT4.BLE_TRY_CONNECT);
+        intentFilter.addAction(BT4.BLE_DISCONNECTED);
+        intentFilter.addAction(BT4.BLE_READ_FILE);
+        registerReceiver(getReceiver, intentFilter);
+    }
+
+    /**
+     * 藍芽已連接/已斷線資訊回傳
+     */
+    private final BroadcastReceiver getReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+            if (BT4.BLE_CONNECTED.equals(action)) {
+                txt_BleStatus.setText("已連線");
+            } else if (BT4.BLE_DISCONNECTED.equals(action)) {
+                txt_BleStatus.setText("已斷線");
+            } else if (BT4.BLE_TRY_CONNECT.equals(action)) {
+                Toast.makeText(global_activity, "搜尋到裝置，連線中", Toast.LENGTH_SHORT).show();
+            } else if (BT4.BLE_READ_FILE.equals(action)) {
+                txt_countDown.setText((bt4.file_data.size() * 100 / bt4.File_Count) + " %");
+            }
+        }
+    };
+
+    /**
+     * 螢幕恆亮
+     **/
+    public void setScreenOn() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    public void setScreenOff() {
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
     private void initObject() {
         btn_detect = findViewById(R.id.btn_detect);
-        btn_stop = findViewById(R.id.btn_stop);
         btn_choose = findViewById(R.id.btn_choose);
+        btn_stop = findViewById(R.id.btn_stop);
+        txt_BleStatus = findViewById(R.id.txt_BleStatus);
         txt_file = findViewById(R.id.txt_file);
         txt_result = findViewById(R.id.txt_result);
         txt_value = findViewById(R.id.txt_value);
         txt_count = findViewById(R.id.txt_count);
         txt_countDown = findViewById(R.id.txt_countDown);
-        BT_Status_Text = findViewById(R.id.textView);
-        chart1 = findViewById(R.id.linechart);
+        lineChart = findViewById(R.id.linechart);
 
         try {
             File file = new File(filePath);
@@ -155,6 +234,12 @@ public class LoginActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e("where", e.toString());
         }
+        btn_stop.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                stopCountdownWave();
+            }
+        });
     }
 
     /**
@@ -167,7 +252,33 @@ public class LoginActivity extends AppCompatActivity {
         if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
         }
-        initChooser();
+        List<String> mPermissionList = new ArrayList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            mPermissionList.add(Manifest.permission.BLUETOOTH_SCAN);
+            mPermissionList.add(Manifest.permission.BLUETOOTH_ADVERTISE);
+            mPermissionList.add(Manifest.permission.BLUETOOTH_CONNECT);
+        } else {
+            mPermissionList.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+            mPermissionList.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            mPermissionList.add(Manifest.permission.MANAGE_EXTERNAL_STORAGE);
+        }
+        checkStorageManagerPermission();
+        ActivityCompat.requestPermissions(this, mPermissionList.toArray(new String[0]), 1001);
+    }
+    private void checkStorageManagerPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()) {
+        } else {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setMessage("本程式需要您同意允許存取所有檔案權限");
+            builder.setPositiveButton("同意", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                    startActivity(intent);
+                }
+            });
+            builder.show();
+        }
     }
 
     /**
@@ -224,7 +335,7 @@ public class LoginActivity extends AppCompatActivity {
     private void initCheck() {
         if (fileName != null) {
             if (fileName.endsWith(".lp4")) {
-                decpEcgFile(filePath);
+                MainActivity.decpEcgFile(filePath);
                 int u = fileName.length();
                 String j = fileName.substring(0, u - 4);
                 fileName = j + ".cha";
@@ -443,77 +554,115 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     @SuppressLint("HandlerLeak")
-    public void startWave(View view) {
+    public void RecordWaveAction(View view) {
         bt4.Bluetooth_init();
         if (bt4.isconnect) {
-            bt4.WhenConnectBLE(new Handler() {
+            runOnUiThread(new Runnable() {
                 @Override
-                public void handleMessage(Message msg2) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-//                            BT_Power_Text.setText(bt4.Battery_Percent + "%");
-                        }
-                    });
+                public void run() {
+                    lineChart.clear();
+                    lineChart.invalidate();
+                    initchart();
                 }
             });
-
             bt4.Wave(true, new Handler());
-
             if (!isCountDownRunning) {
-                new CountDownTimer(5000, 1000) { // 30秒的倒數計時，每秒觸發一次onTick
-                    public void onTick(long millisUntilFinished) {
-                        // 每次倒數計時觸發的操作，這裡可以更新UI以顯示剩餘時間
-                        txt_countDown.setText(millisUntilFinished / 1000 + "");
-                    }
+                isDetectOver = false;
+                startCountDown();
+            }
+        }
+    }
 
-                    public void onFinish() {
-                        // 倒數結束後執行的操作
+    private void startCountDown() {
+        isCountDownRunning = true;
+        isDetectOver = false;
+        countDownHandler.postDelayed(new Runnable() {
+            private int presetTime = 6000;
+            private int remainingTime = COUNTDOWN_TOTAL_TIME;
+
+            @Override
+            public void run() {
+                if (!isToastShown) {
+                    Toast.makeText(global_activity, "請將手指放置於裝置上，量測馬上開始", Toast.LENGTH_LONG).show();
+                    isToastShown = true;
+                }
+                if (presetTime <= 0) {//倒數6秒結束才開始跑波
+                    bt4.continueWave = true;
+                    if (remainingTime <= 0) {//結束的動作
                         txt_countDown.setText("30");
                         stopWave();
                         isCountDownRunning = false;
+                        isDetectOver = true;
+                    } else {//秒數顯示
+                        txt_countDown.setText(String.valueOf(remainingTime / 1000));
+                        remainingTime -= COUNTDOWN_INTERVAL;
+                        countDownHandler.postDelayed(this, COUNTDOWN_INTERVAL);
                     }
-                }.start();
-                isCountDownRunning = true;
+                } else {
+                    bt4.continueWave = false;
+                    txt_countDown.setText(String.valueOf(presetTime / 1000));
+                    presetTime -= COUNTDOWN_INTERVAL;
+                    countDownHandler.postDelayed(this, COUNTDOWN_INTERVAL);
+                }
             }
+        }, COUNTDOWN_INTERVAL);
+    }
+
+    private void stopCountdownWave() {
+        if (isCountDownRunning) {
+            countDownHandler.removeCallbacksAndMessages(null); // 移除倒數
+            isCountDownRunning = false;
+            txt_countDown.setText("30");
+            stopWave();
         }
     }
 
     @SuppressLint("HandlerLeak")
     public void stopWave() {
-        ShowToast("正在停止跑波...");
-        bt4.StopMeasure(new Handler() {
-            @Override
-            public void handleMessage(Message msg2) {
-                ShowToast("完成停止跑波");
-                final int[] step = {0};
-                bt4.Record_Size(new Handler() {
-                    @Override
-                    public void handleMessage(Message msg) {
-
-                        if (step[0] == 0) {
-                            Log.d("wwwww", "讀取檔案大小");
-
-                            bt4.File_Size(this);
-                        }
-
-                        if (step[0] == 1) {
-                            Log.d("wwwww", "打開檔案");
-
-                            bt4.Open_File(this);
-                        }
-
-                        if (step[0] == 2) {
-                            Log.d("wwwww", "讀取檔案");
-                            bt4.ReadData(this);
-                        }
-
-                        if (step[0] == 3) {
-                            saveLP4(bt4.file_data);
-                        }
-                        step[0]++;
+        if (bt4.isWave) {
+            ShowToast("正在停止跑波...");
+            bt4.StopMeasure(new Handler() {
+                @Override
+                public void handleMessage(Message msg2) {
+                    ShowToast("完成停止跑波");
+                    if (isDetectOver) {
+                        readFile();
                     }
-                });
+                }
+            });
+        }
+    }
+
+    @SuppressLint("HandlerLeak")
+    private void readFile() {
+        final int[] step = {0};
+        bt4.Record_Size(new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                if (step[0] == 0) {
+                    Log.d("wwwww", "讀取檔案大小");
+                    bt4.File_Size(this);
+                }
+
+                if (step[0] == 1) {
+                    Log.d("wwwww", "打開檔案");
+
+                    bt4.Open_File(this);
+                }
+
+                if (step[0] == 2) {
+                    Log.d("wwwww", "讀取檔案");
+                    bt4.ReadData(this);
+                }
+
+                if (step[0] == 3) {
+                    saveLP4(bt4.file_data);
+                }
+
+                if (step[0] == 4) {
+                    bt4.Delete_AllRecor(this);
+                }
+                step[0]++;
             }
         });
     }
@@ -574,28 +723,28 @@ public class LoginActivity extends AppCompatActivity {
 
     public void initchart() {
         //圖表設定2（開始頁）
-        chart1.setData(new LineData());
-        chart1.getXAxis().setValueFormatter(null);
-        chart1.getXAxis().setDrawLabels(false);
-        chart1.getXAxis().setDrawGridLines(false);
-        chart1.getAxisLeft().setDrawGridLines(false);
-        chart1.getAxisLeft().setDrawAxisLine(false);
-        chart1.getAxisLeft().setGranularityEnabled(false);
-        chart1.getXAxis().setDrawAxisLine(false);
-        chart1.getAxisLeft().setDrawLabels(false);
-        chart1.getAxisLeft().setAxisMinimum(1500);
-        chart1.getAxisLeft().setAxisMaximum(2500);
-        chart1.setScaleEnabled(false);
-        chart1.setScaleXEnabled(true);
-        chart1.getXAxis().setAxisMinimum(0);
-        chart1.getXAxis().setAxisMaximum(300);
-        chart1.getXAxis().setGranularity(30);
-        chart1.getAxisLeft().setGranularity(250);
-        chart1.getAxisRight().setDrawLabels(false);
-        chart1.getAxisRight().setDrawGridLines(false);
-        chart1.getAxisRight().setDrawAxisLine(false);
-        chart1.getDescription().setText("");
-        chart1.getLegend().setEnabled(false);
+        lineChart.setData(new LineData());
+        lineChart.getXAxis().setValueFormatter(null);
+        lineChart.getXAxis().setDrawLabels(false);
+        lineChart.getXAxis().setDrawGridLines(false);
+        lineChart.getAxisLeft().setDrawGridLines(false);
+        lineChart.getAxisLeft().setDrawAxisLine(false);
+        lineChart.getAxisLeft().setGranularityEnabled(false);
+        lineChart.getXAxis().setDrawAxisLine(false);
+        lineChart.getAxisLeft().setDrawLabels(false);
+        lineChart.getAxisLeft().setAxisMinimum(1500);
+        lineChart.getAxisLeft().setAxisMaximum(2500);
+        lineChart.setScaleEnabled(false);
+        lineChart.setScaleXEnabled(true);
+        lineChart.getXAxis().setAxisMinimum(0);
+        lineChart.getXAxis().setAxisMaximum(300);
+        lineChart.getXAxis().setGranularity(30);
+        lineChart.getAxisLeft().setGranularity(250);
+        lineChart.getAxisRight().setDrawLabels(false);
+        lineChart.getAxisRight().setDrawGridLines(false);
+        lineChart.getAxisRight().setDrawAxisLine(false);
+        lineChart.getDescription().setText("");
+        lineChart.getLegend().setEnabled(false);
         chartSet1.setColor(Color.BLACK);
         chartSet1.setDrawCircles(false);
         chartSet1.setDrawFilled(false);
@@ -604,9 +753,20 @@ public class LoginActivity extends AppCompatActivity {
         chartSet1.setLineWidth((float) 1.5);
         chartSet1.setDrawValues(false);
         chartSet1.setDrawFilled(true);
+
+        float scaleX = lineChart.getScaleX();
+        if (scaleX == 1)
+            lineChart.zoomToCenter(5, 1f);
+        else {
+            BarLineChartTouchListener barLineChartTouchListener = (BarLineChartTouchListener) lineChart.getOnTouchListener();
+            barLineChartTouchListener.stopDeceleration();
+            lineChart.fitScreen();
+        }
+
+        lineChart.invalidate();
     }
 
-    public static void DrawChart(byte[] result) {
+    public static void DrawChart1(byte[] result) {
         try {
             global_activity.runOnUiThread(new Runnable() {
                 @Override
@@ -644,13 +804,23 @@ public class LoginActivity extends AppCompatActivity {
                     Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
                     chartSet1Entries.add(chartSet1Entrie);
                     chartSet1.setValues(chartSet1Entries);
-                    chart1.setData(new LineData(chartSet1));
-                    chart1.setVisibleXRangeMinimum(300);
-                    chart1.invalidate();
+                    lineChart.setData(new LineData(chartSet1));
+                    lineChart.setDragEnabled(true);
+                    lineChart.setVisibleXRangeMinimum(300);
+                    float scaleX = lineChart.getScaleX();
+                    if (scaleX == 1)
+                        lineChart.zoomToCenter(5, 1f);
+                    else {
+                        BarLineChartTouchListener barLineChartTouchListener = (BarLineChartTouchListener) lineChart.getOnTouchListener();
+                        barLineChartTouchListener.stopDeceleration();
+                        lineChart.fitScreen();
+                    }
+                    lineChart.invalidate();
+                    lineChart.invalidate();
                 }
             });
         } catch (Exception ex) {
-            Log.d("wwwww", "eeeeeerrr = " + ex.toString());
+//            Log.d("wwwww", "eeeeeerrr = " + ex.toString());
         }
     }
 
