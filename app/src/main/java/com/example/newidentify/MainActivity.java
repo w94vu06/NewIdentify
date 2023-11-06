@@ -9,7 +9,6 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.Dialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -68,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
      **/
     private String path, filePath, fileName, ans, readTxt;
     private int dataCollectionLimit = 5;//設定檔案收集數量，最高20
-    private int count;
+    private int ccccc;
     private Boolean checkX;
     private ChooserDialog chooserDialog; //檔案選擇器
     private Map<String, String> dataMap = new HashMap<>();
@@ -359,7 +358,7 @@ public class MainActivity extends AppCompatActivity {
         if (x == 1) {
             txt_result.setText("檔案訊號error，請換個檔案繼續");
         } else {
-            count += 1;
+//            ccccc += 1;
         }
         filePath = path;
         fileName = fileName.substring(0, fileName.length() - 4);
@@ -396,7 +395,7 @@ public class MainActivity extends AppCompatActivity {
                         getValue();
                     }
                 } else {
-                    count -= 1;
+//                    ccccc -= 1;
                     ShowToast("訊號品質不好，請重新量測");
                 }
                 if (heartRate.size() == dataCollectionLimit) {
@@ -463,10 +462,10 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (ans.equals("本人")) {
                 Log.d("ListValue", dataMap.get("Average"));
-                heartRate.set(count % dataCollectionLimit - 1, ValueHR);
-                PI.set(count % dataCollectionLimit - 1, ValuePI);
-                CVI.set(count % dataCollectionLimit - 1, ValueCvi);
-                C1a.set(count % dataCollectionLimit - 1, ValueC1a);
+                heartRate.set(heartRate.size() % dataCollectionLimit - 1, ValueHR);
+                PI.set(heartRate.size() % dataCollectionLimit - 1, ValuePI);
+                CVI.set(heartRate.size() % dataCollectionLimit - 1, ValueCvi);
+                C1a.set(heartRate.size() % dataCollectionLimit - 1, ValueC1a);
             } else {
                 newDialog();
             }
@@ -503,7 +502,7 @@ public class MainActivity extends AppCompatActivity {
             C1a.add(ValueC1a);
 
             String s = String.format("HR: %s\nPI: %s\nCVI: %s\nC1a: %s", heartRate.toString(), PI.toString(), CVI.toString(), C1a.toString());
-            txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, count));
+            txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, heartRate.size()));
             txt_result.setText("檔案數量不足");
             txt_value.setText(s);
 
@@ -541,7 +540,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void saveInfoToPreference() {
 
-        tinyDB.putInt("count", count);
+        tinyDB.putInt("count", heartRate.size());
 
         // 儲存Map
         Gson gson = new Gson();
@@ -867,6 +866,7 @@ public class MainActivity extends AppCompatActivity {
                 byte[] lp4Text = new byte[file_data.size()];
                 for (int i = 0; i < file_data.size(); i++) {
                     lp4Text[i] = file_data.get(i);
+                    Log.d("pppp", "lp4Text: " + file_data.get(i));
                 }
                 fos.write(lp4Text);
                 fos.close();

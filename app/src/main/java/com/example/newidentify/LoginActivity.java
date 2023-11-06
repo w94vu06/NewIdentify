@@ -358,7 +358,7 @@ public class LoginActivity extends AppCompatActivity {
         if (x == 1) {
             txt_result.setText("檔案訊號error，請換個檔案繼續");
         } else {
-            count += 1;
+//            count += 1;
         }
         filePath = path;
         fileName = fileName.substring(0, fileName.length() - 4);
@@ -405,7 +405,7 @@ public class LoginActivity extends AppCompatActivity {
                     txt_result.setText("檔案數量不足");
                 }
                 txt_value.setText(s);
-                txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit + 1, count));
+                txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit + 1,heartRate.size()));
                 reader.close();
             }
         } catch (Exception e) {
@@ -447,10 +447,10 @@ public class LoginActivity extends AppCompatActivity {
         try {
             if (ans.equals("本人")) {
                 Log.d("ListValue", dataMap.get("Average"));
-                heartRate.set(count % dataCollectionLimit - 1, ValueHR);
-                PI.set(count % dataCollectionLimit - 1, ValuePI);
-                CVI.set(count % dataCollectionLimit - 1, ValueCvi);
-                C1a.set(count % dataCollectionLimit - 1, ValueC1a);
+                heartRate.set(heartRate.size() % dataCollectionLimit - 1, ValueHR);
+                PI.set(heartRate.size() % dataCollectionLimit - 1, ValuePI);
+                CVI.set(heartRate.size() % dataCollectionLimit - 1, ValueCvi);
+                C1a.set(heartRate.size() % dataCollectionLimit - 1, ValueC1a);
             } else {
                 newDialog();
             }
@@ -486,7 +486,7 @@ public class LoginActivity extends AppCompatActivity {
             C1a.add(ValueC1a);
 
             String s = String.format("HR: %s\nPI: %s\nCVI: %s\nC1a: %s", heartRate.toString(), PI.toString(), CVI.toString(), C1a.toString());
-            txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, count));
+            txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, heartRate.size()));
             txt_result.setText("檔案數量不足");
             txt_value.setText(s);
             dialog.dismiss();
