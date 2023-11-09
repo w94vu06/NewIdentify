@@ -47,3 +47,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 #        lomb
         android
         log)
+
+target_link_libraries("lp4tocha"
+        # List libraries link to the target library
+        #        lomb
+        android
+        log)

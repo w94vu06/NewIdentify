@@ -90,6 +90,7 @@ public class BT4 {
     BluetoothManager mBluetoothManager;
     BluetoothAdapter mBluetoothAdapter;
     public ArrayList<BluetoothDevice> mBluetoothDevices = new ArrayList<BluetoothDevice>();
+    String deviceName = "";
 
     //詢問檔案筆數
     public int ECG_Count = 0;
@@ -152,7 +153,7 @@ public class BT4 {
                         //如沒重複則添加到bluetoothdevices中
                         if (device.getName() != null) {
                             mBluetoothDevices.add(device);
-                            if (device.getName().toString().equals("CmateH")) {
+                            if (device.getName().toString().equals(deviceName)) {
                                 String intentAction;
                                 intentAction = BLE_TRY_CONNECT;
                                 broadcastUpdate(intentAction);
@@ -639,8 +640,8 @@ public class BT4 {
                                             }
 //                                            Log.d("wwwww", "result = " + result);
 
-                                            if (wave_array.size() >= 7) {
-                                                Log.d(bluetooth_Tag, "wave_array = " + wave_array.size() + "     bytesAvailable = " + Buffer_Array.size());
+                                            if (wave_array.size() >= 7 && isTenSec) {
+//                                                Log.d(bluetooth_Tag, "wave_array = " + wave_array.size() + "     bytesAvailable = " + Buffer_Array.size());
                                                 byte[] ecgbyte = new byte[7];
                                                 ecgbyte[0] = wave_array.get(0);
                                                 ecgbyte[1] = wave_array.get(1);
@@ -662,7 +663,6 @@ public class BT4 {
                                                 if (valid.equals("aaa0") && isTenSec) {
                                                     DrawChart(ecgbyte);
                                                     DrawChart1(ecgbyte);
-                                                    Log.d("ssss", "run: " + ecgbyte.toString());
 //                                                    Log.d("wwwww", "畫圖");
                                                 }
                                             }

@@ -63,6 +63,7 @@ public class LoginActivity extends AppCompatActivity {
      **/
     Button btn_choose, btn_detect,btn_stop;
     TextView txt_file, txt_result, txt_value, txt_count,textView;
+    private String readTxt;
     /**
      * Parameter
      **/
@@ -238,6 +239,12 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 stopCountdownWave();
+                heartRate.clear();
+                PI.clear();
+                CVI.clear();
+                C1a.clear();
+                String s = String.format("HR: %s \n PI: %s \n CVI: %s \n C1a: %s", heartRate.toString(), PI.toString(), CVI.toString(), C1a.toString());
+                txt_value.setText(s);
             }
         });
     }
@@ -335,7 +342,7 @@ public class LoginActivity extends AppCompatActivity {
     private void initCheck() {
         if (fileName != null) {
             if (fileName.endsWith(".lp4")) {
-                MainActivity.decpEcgFile(filePath);
+//                MainActivity.analyzeEcgData(filePath);
                 int u = fileName.length();
                 String j = fileName.substring(0, u - 4);
                 fileName = j + ".cha";
@@ -368,10 +375,11 @@ public class LoginActivity extends AppCompatActivity {
                 BufferedReader reader = new BufferedReader(new FileReader(file));
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    txt_result.setText(line);
+//                    txt_result.setText(line);
+                    readTxt = line;
                 }
-                line = txt_result.getText().toString();
-                String[] parts = line.split(",");
+//                line = txt_result.getText().toString();
+                String[] parts = readTxt.split(",");
 
                 for (String part : parts) {
                     String[] nameValue = part.split(":");
@@ -385,12 +393,17 @@ public class LoginActivity extends AppCompatActivity {
                 ValuePI = Double.parseDouble(dataMap.get("PI"));
                 ValueCvi = Double.parseDouble(dataMap.get("CVI"));
                 ValueC1a = Double.parseDouble(dataMap.get("C1a"));
-                if (heartRate.size() < dataCollectionLimit) {//如果數據數小於dataCollectionLimit就繼續收集
-                    heartRate.add(ValueHR);//把LP4算好的結果加進List
-                    PI.add(ValuePI);
-                    CVI.add(ValueCvi);
-                    C1a.add(ValueC1a);
-                    getValue();
+                if (ValueHR > 50 && ValueHR < 150) {
+                    if (heartRate.size() < dataCollectionLimit) {//如果數據數小於dataCollectionLimit就繼續收集
+                        heartRate.add(ValueHR);//把LP4算好的結果加進List
+                        PI.add(ValuePI);
+                        CVI.add(ValueCvi);
+                        C1a.add(ValueC1a);
+                        getValue();
+                    }
+                } else {
+//                    ccccc -= 1;
+                    ShowToast("訊號品質不好，請重新量測");
                 }
                 if (heartRate.size() > dataCollectionLimit) {
                    judgeValue();
@@ -672,17 +685,19 @@ public class LoginActivity extends AppCompatActivity {
         new Thread(() -> {
             String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(System.currentTimeMillis());
             String folderName = "Revlis_ID_Detect"; // 資料夾名稱
-            String s = "[" + date + "]revlis.lp4";
+            String fileName = "[" + date + "]revlis.lp4";
 
             try {
-                File folder = new File(Environment.getExternalStorageDirectory(), folderName);
+                File internalStorageDir = getFilesDir(); // 內部存儲目錄
+
+                File folder = new File(internalStorageDir, folderName);
 
                 // 如果資料夾不存在，建立
                 if (!folder.exists()) {
                     folder.mkdirs();
                 }
 
-                File fileLocation = new File(folder, s);
+                File fileLocation = new File(folder, fileName);
                 FileOutputStream fos = new FileOutputStream(fileLocation);
                 byte[] lp4Text = new byte[file_data.size()];
                 for (int i = 0; i < file_data.size(); i++) {
@@ -691,7 +706,8 @@ public class LoginActivity extends AppCompatActivity {
                 fos.write(lp4Text);
                 fos.close();
 
-                MediaScannerConnection.scanFile(this, new String[]{fileLocation.getAbsolutePath()}, null, null);
+                // 不需要 MediaScannerConnection，因為內部存儲不需要掃描
+
                 String savedFilePath = fileLocation.getAbsolutePath();
                 ShowToast("檔案已儲存");
 
@@ -701,6 +717,7 @@ public class LoginActivity extends AppCompatActivity {
             }
         }).start();
     }
+
 
     public void setChooseFile(String path) {
         File file = new File(path);
@@ -910,5 +927,5 @@ public class LoginActivity extends AppCompatActivity {
     }//ShowToast
 
     public native int anaEcgFile(String name, String path);
-    public native int decpEcgFile(String path);
+//    public native int decpEcgFile(String path);
 }

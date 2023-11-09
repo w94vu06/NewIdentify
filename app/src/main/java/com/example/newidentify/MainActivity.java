@@ -9,6 +9,7 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -18,17 +19,21 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.MediaScannerConnection;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -60,6 +65,10 @@ public class MainActivity extends AppCompatActivity {
      **/
     Button btn_choose, btn_detect, btn_stop;
     TextView txt_file, txt_result, txt_value, txt_count;
+
+    /** choose Device Dialog*/
+
+    Dialog dialog ;
 
 
     /**
@@ -135,12 +144,14 @@ public class MainActivity extends AppCompatActivity {
         global_activity = this;
         bt4 = new BT4(global_activity);
         tinyDB = new TinyDB(this);
-
+        dialog = new Dialog(global_activity);
         lineChart = findViewById(R.id.linechart);
         initchart();
         initObject();
         initPermission();
         checkStorageManagerPermission();
+
+        initDeviceDialog();
     }
 
     @Override
@@ -148,7 +159,6 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         initChooser();
         initBroadcast();
-        bt4.Bluetooth_init();
         setScreenOn();
     }
 
@@ -286,10 +296,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 //找外部儲存
-                String externalStorageDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
-//                String externalStorageDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath();
+//                String externalStorageDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
+                File obbDir = new File(Environment.getExternalStorageDirectory() + "/Android/obb/" + getPackageName());
+
                 chooserDialog = new ChooserDialog(MainActivity.this)
-                        .withStartFile(String.valueOf(externalStorageDirectory + "/Apple_ID_Detect"))
+//                        .withStartFile(String.valueOf(externalStorageDirectory + "/Apple_ID_Detect"))
+                        .withStartFile(String.valueOf(obbDir))
                         .withOnCancelListener(new DialogInterface.OnCancelListener() {
                             @Override
                             public void onCancel(DialogInterface dialogInterface) {
@@ -328,6 +340,43 @@ public class MainActivity extends AppCompatActivity {
         thread.start();
     }
 
+    public void initDeviceDialog() {
+        dialog.setContentView(R.layout.dialog_device);
+        // 初始化元件
+        RadioGroup devicesRadioGroup = dialog.findViewById(R.id.devicesRadioGroup);
+        RadioButton radioButtonDevice1 = dialog.findViewById(R.id.radioButtonDevice1);
+        RadioButton radioButtonDevice2 = dialog.findViewById(R.id.radioButtonDevice2);
+        Button completeButton = dialog.findViewById(R.id.completeButton);
+        dialog.setCancelable(false);
+
+        // 設置按鈕點擊監聽器
+        completeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // 在這裡處理完成按鈕的點擊事件
+                // 檢查哪個 RadioButton 被選中
+                int checkedRadioButtonId = devicesRadioGroup.getCheckedRadioButtonId();
+                if (checkedRadioButtonId == R.id.radioButtonDevice1) {
+                    bt4.deviceName = "CmateH";
+                    bt4.Bluetooth_init();
+                    dialog.dismiss();
+
+                } else if (checkedRadioButtonId == R.id.radioButtonDevice2) {
+                    bt4.deviceName = "WTK230";
+                    bt4.Bluetooth_init();
+                    dialog.dismiss();
+                    // 處理選中 Device 2 的邏輯
+                } else {
+                    // 提示用戶選擇一個裝置
+                    Toast.makeText(global_activity, "請選擇一個裝置", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        // 顯示對話框
+        dialog.show();
+    }
+
 
     /**
      * ID識別按鈕事件
@@ -336,6 +385,7 @@ public class MainActivity extends AppCompatActivity {
         if (fileName != null) {
             if (fileName.endsWith(".lp4")) {
                 decpEcgFile(filePath);
+
                 int u = fileName.length();
                 String j = fileName.substring(0, u - 4);
                 fileName = j + ".cha";
@@ -371,8 +421,7 @@ public class MainActivity extends AppCompatActivity {
 //                    txt_result.setText(line);
                     readTxt = line;
                 }
-                line = readTxt;
-                String[] parts = line.split(",");
+                String[] parts = readTxt.split(",");
 
                 for (String part : parts) {
                     String[] nameValue = part.split(":");
@@ -440,6 +489,7 @@ public class MainActivity extends AppCompatActivity {
             maxC1a = C1a.stream().mapToDouble(Double::valueOf).max().getAsDouble();
             minC1a = C1a.stream().mapToDouble(Double::valueOf).min().getAsDouble();
         }
+
     }
 
     //把上面從C拿到的各項數據存Preference，之後移植judgeValue到登入
@@ -599,28 +649,22 @@ public class MainActivity extends AppCompatActivity {
                         chartSet1Entries = temp;
                         oldValue = temp_old;
                     }
-                    oldValue.add((double) ch4);
 
-                    double nvalue = (oldValue.get(oldValue.size() - 1));
-
-                    if (oldValue.size() > 1) {
-                        nvalue = Butterworth(oldValue);
-                    }
-                    Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
                     if (bt4.isTenSec) {
+                        oldValue.add((double) ch4);
+
+                        double nvalue = (oldValue.get(oldValue.size() - 1));
+
+                        if (oldValue.size() > 1) {
+                            nvalue = Butterworth(oldValue);
+                        }
+                        Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
                         chartSet1Entries.add(chartSet1Entrie);
                         chartSet1.setValues(chartSet1Entries);
                         lineChart.setData(new LineData(chartSet1));
                         lineChart.setVisibleXRangeMinimum(300);
                         lineChart.invalidate();
                     }
-
-                    for (Entry entry : chartSet1Entries) {
-                        float xValue = entry.getX();
-                        float yValue = entry.getY();
-                        Log.d("ssss", "run: " + yValue);
-                    }
-
                 }
             });
         } catch (Exception ex) {
@@ -833,7 +877,12 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (step[0] == 3) {
-                    saveLP4(bt4.file_data);
+//                    initCheck();
+                    if (bt4.file_data.size() > 0) {
+                        saveLP4(bt4.file_data);
+                    } else {
+                        ShowToast("檔案大小為0");
+                    }
                     bt4.Delete_AllRecor(this);
                 }
 
@@ -865,8 +914,13 @@ public class MainActivity extends AppCompatActivity {
                 FileOutputStream fos = new FileOutputStream(fileLocation);
                 byte[] lp4Text = new byte[file_data.size()];
                 for (int i = 0; i < file_data.size(); i++) {
-                    lp4Text[i] = file_data.get(i);
-                    Log.d("pppp", "lp4Text: " + file_data.get(i));
+                    Byte byteValue = file_data.get(i);
+                    if (byteValue != null) {
+                        lp4Text[i] = byteValue.byteValue();
+                    } else {
+                        ShowToast("ERROR!");
+                        lp4Text[i] = 0;
+                    }
                 }
                 fos.write(lp4Text);
                 fos.close();
@@ -876,11 +930,30 @@ public class MainActivity extends AppCompatActivity {
                 ShowToast("檔案已儲存");
                 Log.d("gggg", "saveLP4: " + savedFilePath);
                 setChooseFile(savedFilePath);
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }).start();
     }
+
+    public void saveByte(ArrayList<Byte> byteArrayList) {
+        // 將 ArrayList<Byte> 轉換為 byte 數組
+        byte[] byteArray = new byte[byteArrayList.size()];
+        for (int i = 0; i < byteArrayList.size(); i++) {
+            byteArray[i] = byteArrayList.get(i);
+        }
+    }
+
+    public void backByte(byte[] byteArray) {
+        // 將 byte 數組轉換為 ArrayList<Byte>
+        ArrayList<Byte> byteArrayList = new ArrayList<>();
+        for (byte b : byteArray) {
+            byteArrayList.add(b);
+        }
+    }
+
+    private static final int PICK_PDF_FILE = 2;
 
     public void setChooseFile(String Apath) {
 
@@ -963,6 +1036,7 @@ public class MainActivity extends AppCompatActivity {
 
     public static native int anaEcgFile(String name, String path);
 
+    //    public static native int decpEcgFile(String path);
     public static native int decpEcgFile(String path);
 
 

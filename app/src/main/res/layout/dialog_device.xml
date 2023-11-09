@@ -1,0 +1,54 @@
+<!-- res/layout/custom_dialog_layout.xml -->
+
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center">
+
+    <!-- TextView -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="請選擇機種"
+        android:textSize="@dimen/sp_18"
+        android:textColor="@android:color/black"
+        android:layout_gravity="center"/>
+
+    <!-- RadioGroup for Devices -->
+    <RadioGroup
+        android:id="@+id/devicesRadioGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
+
+        <!-- RadioButton for Device 1 -->
+        <RadioButton
+            android:id="@+id/radioButtonDevice1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CmateH"/>
+
+        <Space
+            android:layout_width="@dimen/dp_50"
+            android:layout_height="wrap_content"/>
+
+        <!-- RadioButton for Device 2 -->
+        <RadioButton
+            android:id="@+id/radioButtonDevice2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WTK230"/>
+    </RadioGroup>
+
+    <!-- Button -->
+    <Button
+        android:id="@+id/completeButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="完成"
+        android:layout_marginTop="16dp"/>
+</LinearLayout>

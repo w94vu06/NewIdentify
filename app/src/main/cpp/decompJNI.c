@@ -11,9 +11,9 @@
 #define ECG_COMP_BLOCK_SIZE		544
 
 enum {
-	MESSAGE_MAX_BYTES = ECG_COMP_BLOCK_SIZE,
-	RING_BUFFER_BYTES = ECG_COMP_BLOCK_SIZE * 8 + MESSAGE_MAX_BYTES,
-	DECODE_RING_BUFFER = RING_BUFFER_BYTES + MESSAGE_MAX_BYTES   // Intentionally larger, to test unsynchronized ring buffers
+    MESSAGE_MAX_BYTES = ECG_COMP_BLOCK_SIZE,
+    RING_BUFFER_BYTES = ECG_COMP_BLOCK_SIZE * 8 + MESSAGE_MAX_BYTES,
+    DECODE_RING_BUFFER = RING_BUFFER_BYTES + MESSAGE_MAX_BYTES   // Intentionally larger, to test unsynchronized ring buffers
 };
 
 #define CMPBUFSIZE (LZ4_COMPRESSBOUND(MESSAGE_MAX_BYTES))
@@ -42,7 +42,7 @@ JNICALL Java_com_example_newidentify_MainActivity_decpEcgFile
     FILE * pReadFile;	// 來源心電圖檔
     FILE * pOut1;		// 轉換後的心電圖檔
 
-                        // 開啟來源心電圖檔
+    // 開啟來源心電圖檔
     pReadFile = fopen(CompFileName, "r+b");
     if (pReadFile == NULL)
     {
@@ -80,14 +80,10 @@ JNICALL Java_com_example_newidentify_MainActivity_decpEcgFile
         if (nBytesReceived != frameCompSize)
             break;
 
-        //nBytesDecomp = LZ4_decompress_safe(compBuff, decompBuff, frameCompSize, ECG_COMP_BLOCK_SIZE);
-        //nBytesDecomp = LZ4_decompress_fast(compBuff, decompBuff, frameCompSize);
-        //nBytesDecomp = LZ4_decompress_fast(compBuff, decompBuff, ECG_COMP_BLOCK_SIZE);
-
         char* const decPtr = &decompRingBuf[decOffset];
 
         const int decBytes = LZ4_decompress_safe_continue(
-            lz4StreamDecode, compBuff, decPtr, frameCompSize, MESSAGE_MAX_BYTES);
+                lz4StreamDecode, compBuff, decPtr, frameCompSize, MESSAGE_MAX_BYTES);
         if (decBytes <= 0)
             break;
 
@@ -98,19 +94,6 @@ JNICALL Java_com_example_newidentify_MainActivity_decpEcgFile
 
         decOffset += decBytes;
 
-        //const int decBytes = LZ4_decompress_fast_continue(
-        //	lz4StreamDecode, compBuff, decPtr, ECG_COMP_BLOCK_SIZE);
-        //if (decBytes <= 0)
-        //	break;
-
-        // 輸出檔案
-        //nBytesWritten = fwrite(decPtr, 1, ECG_COMP_BLOCK_SIZE, pOut1);
-        //if (nBytesWritten != ECG_COMP_BLOCK_SIZE)
-        //	break;
-
-        //decOffset += ECG_COMP_BLOCK_SIZE;
-
-        // Wraparound the ringbuffer offset
         if (decOffset >= DECODE_RING_BUFFER - MESSAGE_MAX_BYTES)
             decOffset = 0;
     }
@@ -131,7 +114,5 @@ JNICALL Java_com_example_newidentify_MainActivity_decpEcgFile
 }
 
 
-JNIEXPORT jint JNICALL
-Java_com_example_newidentify_LoginActivity_decpEcgFile(JNIEnv *env, jobject thiz, jstring path) {
-    // TODO: implement decpEcgFile()
-}
+
+
