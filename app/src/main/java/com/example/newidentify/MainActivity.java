@@ -19,14 +19,12 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.MediaScannerConnection;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
@@ -43,6 +41,7 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.listener.BarLineChartTouchListener;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.obsez.android.lib.filechooser.ChooserDialog;
 
 import java.io.BufferedReader;
@@ -50,6 +49,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -68,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
 
     /** choose Device Dialog*/
 
-    Dialog dialog ;
+    Dialog deviceDialog;
 
 
     /**
@@ -144,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
         global_activity = this;
         bt4 = new BT4(global_activity);
         tinyDB = new TinyDB(this);
-        dialog = new Dialog(global_activity);
+        deviceDialog = new Dialog(global_activity);
         lineChart = findViewById(R.id.linechart);
         initchart();
         initObject();
@@ -160,6 +160,7 @@ public class MainActivity extends AppCompatActivity {
         initChooser();
         initBroadcast();
         setScreenOn();
+        loadData();
     }
 
     @Override
@@ -341,13 +342,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void initDeviceDialog() {
-        dialog.setContentView(R.layout.dialog_device);
+        deviceDialog.setContentView(R.layout.dialog_device);
         // 初始化元件
-        RadioGroup devicesRadioGroup = dialog.findViewById(R.id.devicesRadioGroup);
-        RadioButton radioButtonDevice1 = dialog.findViewById(R.id.radioButtonDevice1);
-        RadioButton radioButtonDevice2 = dialog.findViewById(R.id.radioButtonDevice2);
-        Button completeButton = dialog.findViewById(R.id.completeButton);
-        dialog.setCancelable(false);
+        RadioGroup devicesRadioGroup = deviceDialog.findViewById(R.id.devicesRadioGroup);
+        RadioButton radioButtonDevice1 = deviceDialog.findViewById(R.id.radioButtonDevice1);
+        RadioButton radioButtonDevice2 = deviceDialog.findViewById(R.id.radioButtonDevice2);
+        Button completeButton = deviceDialog.findViewById(R.id.completeButton);
+        deviceDialog.setCancelable(false);
 
         // 設置按鈕點擊監聽器
         completeButton.setOnClickListener(new View.OnClickListener() {
@@ -359,12 +360,12 @@ public class MainActivity extends AppCompatActivity {
                 if (checkedRadioButtonId == R.id.radioButtonDevice1) {
                     bt4.deviceName = "CmateH";
                     bt4.Bluetooth_init();
-                    dialog.dismiss();
+                    deviceDialog.dismiss();
 
                 } else if (checkedRadioButtonId == R.id.radioButtonDevice2) {
                     bt4.deviceName = "WTK230";
                     bt4.Bluetooth_init();
-                    dialog.dismiss();
+                    deviceDialog.dismiss();
                     // 處理選中 Device 2 的邏輯
                 } else {
                     // 提示用戶選擇一個裝置
@@ -374,7 +375,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // 顯示對話框
-        dialog.show();
+        deviceDialog.show();
     }
 
 
@@ -406,7 +407,7 @@ public class MainActivity extends AppCompatActivity {
     private void initIdentify() {
         int x = anaEcgFile(fileName, path);
         if (x == 1) {
-            txt_result.setText("檔案訊號error，請換個檔案繼續");
+            txt_result.setText("檔案訊號error");
         } else {
 //            ccccc += 1;
         }
@@ -492,81 +493,6 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    //把上面從C拿到的各項數據存Preference，之後移植judgeValue到登入
-    private void judgeValue() {
-        for (Double value : heartRate) {
-            if (value > 100 || value > averageHR * 1.2) {
-                checkX = true;
-                Log.d("HRValue", String.format("x: %b\nhr: %f\naverageHR: %f\naverageHR*1.2: %f", checkX, value, averageHR, averageHR * 1.2));
-                break;
-            } else {
-                checkX = false;
-                Log.d("HRValue", String.format("averageHR: %f\naverageHR*1.2: %f", averageHR, averageHR * 1.2));
-            }
-        }
-        if (checkX || maxPI - minPI > 0.25 || maxCVI - minCVI > 4.5 || abs(maxC1a - averageC1a) >= 20 || abs(minC1a - averageC1a) >= 20) {
-            ans = identifyPlan.Second(averageHR, ValueHR, averagePI, ValuePI, averageCVI, ValueCvi, averageC1a, ValueC1a);
-        } else {
-            ans = identifyPlan.First(averageHR, ValueHR, averagePI, ValuePI, averageCVI, ValueCvi, averageC1a, ValueC1a);
-        }
-        try {
-            if (ans.equals("本人")) {
-                Log.d("ListValue", dataMap.get("Average"));
-                heartRate.set(heartRate.size() % dataCollectionLimit - 1, ValueHR);
-                PI.set(heartRate.size() % dataCollectionLimit - 1, ValuePI);
-                CVI.set(heartRate.size() % dataCollectionLimit - 1, ValueCvi);
-                C1a.set(heartRate.size() % dataCollectionLimit - 1, ValueC1a);
-            } else {
-                newDialog();
-            }
-        } catch (Exception e) {
-            Log.e("super", e.toString());
-        }
-    }
-
-    private void newDialog() {
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
-        alertDialog.setTitle("是否為帳號本人使用？");
-        alertDialog.setPositiveButton("是", ((dialog, which) -> {
-        }));
-        alertDialog.setNegativeButton("否", ((dialog, which) -> {
-        }));
-        AlertDialog dialog = alertDialog.create();
-        dialog.show();
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener((v -> {
-            switch (dataCollectionLimit) {
-                case 5:
-                    dataCollectionLimit = 10;
-                    break;
-                case 10:
-                    dataCollectionLimit = 15;
-                    break;
-                case 15:
-                    dataCollectionLimit = 20;
-                    break;
-            }
-
-            heartRate.add(ValueHR);
-            PI.add(ValuePI);
-            CVI.add(ValueCvi);
-            C1a.add(ValueC1a);
-
-            String s = String.format("HR: %s\nPI: %s\nCVI: %s\nC1a: %s", heartRate.toString(), PI.toString(), CVI.toString(), C1a.toString());
-            txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, heartRate.size()));
-            txt_result.setText("檔案數量不足");
-            txt_value.setText(s);
-
-            dialog.dismiss();
-        }));
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener((v -> {
-            txt_result.setText("非本人");
-            dialog.dismiss();
-        }));
-
-        dialog.setCancelable(false);
-        dialog.setCanceledOnTouchOutside(false);
-    }
-
     private void signUpDialog() {
         AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
         alertDialog.setTitle("是否回到登入頁面？");
@@ -621,6 +547,11 @@ public class MainActivity extends AppCompatActivity {
         editor.apply();
     }
 
+    public void loadData() {
+        int count = tinyDB.getInt("count");
+        txt_count.setText("目前已註冊"+count+"筆資料\n 如開始量測將會覆蓋此資料");
+    }
+
     public static void DrawChart(byte[] result) {
         try {
             global_activity.runOnUiThread(new Runnable() {
@@ -671,6 +602,9 @@ public class MainActivity extends AppCompatActivity {
 //            Log.d("wwwww", "eeeeeerrr = " + ex.toString());
         }
     }
+
+
+
 
     public static int getStreamLP(int NewSample) {
         int tmp = 0;
@@ -899,9 +833,9 @@ public class MainActivity extends AppCompatActivity {
     private void saveLP4(ArrayList<Byte> file_data) {
 
         new Thread(() -> {
-            String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(System.currentTimeMillis());
+            String date = new SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault()).format(System.currentTimeMillis());
             String folderName = "Apple_ID_Detect"; // 資料夾名稱
-            String s = date + "RV.lp4";
+            String s = date + "_888888.lp4";
 
             try {
                 File folder = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), folderName);

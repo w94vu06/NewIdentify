@@ -6,6 +6,7 @@ import static java.lang.Math.abs;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -14,7 +15,6 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.media.MediaScannerConnection;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
@@ -26,6 +26,8 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -62,8 +64,12 @@ public class LoginActivity extends AppCompatActivity {
      * UI
      **/
     Button btn_choose, btn_detect,btn_stop;
-    TextView txt_file, txt_result, txt_value, txt_count,textView;
+    TextView txt_file, txt_result, txt_value, txt_count,textView,txt_login;
     private String readTxt;
+
+    /** choose Device Dialog*/
+
+    Dialog deviceDialog;
     /**
      * Parameter
      **/
@@ -80,6 +86,12 @@ public class LoginActivity extends AppCompatActivity {
     private ArrayList<Double> PI = new ArrayList<>();
     private ArrayList<Double> CVI = new ArrayList<>();
     private ArrayList<Double> C1a = new ArrayList<>();
+    //test
+    ArrayList<Double> hrList = new ArrayList<Double>();
+    ArrayList<Double> piList = new ArrayList<Double>();
+    ArrayList<Double> cviList = new ArrayList<Double>();
+    ArrayList<Double> c1aList = new ArrayList<Double>();
+
     double averageHR, averagePI, averageCVI, averageC1a;
     double maxPI, maxCVI, maxC1a;
     double minPI, minCVI, minC1a;
@@ -140,12 +152,13 @@ public class LoginActivity extends AppCompatActivity {
         bt4 = new BT4(global_activity);
         tinyDB = new TinyDB(this);
         textView = findViewById(R.id.txt_BleStatus);
-
+        deviceDialog = new Dialog(global_activity);
         initObject();
         initPermission();
         initchart();
         loadData();
-        bt4.Bluetooth_init();
+
+        initDeviceDialog();
 
     }
 
@@ -159,7 +172,6 @@ public class LoginActivity extends AppCompatActivity {
         super.onResume();
         initChooser();
         initBroadcast();
-        bt4.Bluetooth_init();
         setScreenOn();
     }
 
@@ -222,6 +234,7 @@ public class LoginActivity extends AppCompatActivity {
         txt_result = findViewById(R.id.txt_result);
         txt_value = findViewById(R.id.txt_value);
         txt_count = findViewById(R.id.txt_count);
+        txt_login = findViewById(R.id.txt_login);
         txt_countDown = findViewById(R.id.txt_countDown);
         lineChart = findViewById(R.id.linechart);
 
@@ -336,13 +349,50 @@ public class LoginActivity extends AppCompatActivity {
         thread.start();
     }
 
+    public void initDeviceDialog() {
+        deviceDialog.setContentView(R.layout.dialog_device);
+        // 初始化元件
+        RadioGroup devicesRadioGroup = deviceDialog.findViewById(R.id.devicesRadioGroup);
+        RadioButton radioButtonDevice1 = deviceDialog.findViewById(R.id.radioButtonDevice1);
+        RadioButton radioButtonDevice2 = deviceDialog.findViewById(R.id.radioButtonDevice2);
+        Button completeButton = deviceDialog.findViewById(R.id.completeButton);
+        deviceDialog.setCancelable(false);
+
+        // 設置按鈕點擊監聽器
+        completeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // 在這裡處理完成按鈕的點擊事件
+                // 檢查哪個 RadioButton 被選中
+                int checkedRadioButtonId = devicesRadioGroup.getCheckedRadioButtonId();
+                if (checkedRadioButtonId == R.id.radioButtonDevice1) {
+                    bt4.deviceName = "CmateH";
+                    bt4.Bluetooth_init();
+                    deviceDialog.dismiss();
+
+                } else if (checkedRadioButtonId == R.id.radioButtonDevice2) {
+                    bt4.deviceName = "WTK230";
+                    bt4.Bluetooth_init();
+                    deviceDialog.dismiss();
+                    // 處理選中 Device 2 的邏輯
+                } else {
+                    // 提示用戶選擇一個裝置
+                    Toast.makeText(global_activity, "請選擇一個裝置", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        // 顯示對話框
+        deviceDialog.show();
+    }
+
     /**
      * ID識別按鈕事件
      **/
     private void initCheck() {
         if (fileName != null) {
             if (fileName.endsWith(".lp4")) {
-//                MainActivity.analyzeEcgData(filePath);
+                MainActivity.decpEcgFile(filePath);
                 int u = fileName.length();
                 String j = fileName.substring(0, u - 4);
                 fileName = j + ".cha";
@@ -363,7 +413,7 @@ public class LoginActivity extends AppCompatActivity {
     private void initIdentify() {
         int x = MainActivity.anaEcgFile(fileName, path);
         if (x == 1) {
-            txt_result.setText("檔案訊號error，請換個檔案繼續");
+            txt_result.setText("檔案訊號error");
         } else {
 //            count += 1;
         }
@@ -393,12 +443,21 @@ public class LoginActivity extends AppCompatActivity {
                 ValuePI = Double.parseDouble(dataMap.get("PI"));
                 ValueCvi = Double.parseDouble(dataMap.get("CVI"));
                 ValueC1a = Double.parseDouble(dataMap.get("C1a"));
+
+                hrList.add(ValueHR);
+                piList.add(ValuePI);
+                cviList.add(ValueCvi);
+                c1aList.add(ValueC1a);
+
+                String loginData = String.format("HR: %s \n PI: %s \n CVI: %s \n C1a: %s", hrList.toString(), piList.toString(), cviList.toString(), c1aList.toString());
+                txt_login.setText(loginData);
+
                 if (ValueHR > 50 && ValueHR < 150) {
                     if (heartRate.size() < dataCollectionLimit) {//如果數據數小於dataCollectionLimit就繼續收集
                         heartRate.add(ValueHR);//把LP4算好的結果加進List
                         PI.add(ValuePI);
                         CVI.add(ValueCvi);
-                        C1a.add(ValueC1a);
+                        c1aList.add(ValueC1a);
                         getValue();
                     }
                 } else {
@@ -409,8 +468,7 @@ public class LoginActivity extends AppCompatActivity {
                    judgeValue();
                 }
                 String s = String.format("HR: %s \n PI: %s \n CVI: %s \n C1a: %s", heartRate.toString(), PI.toString(), CVI.toString(), C1a.toString());
-                Log.d("getListSize", String.valueOf(heartRate.size()));
-                Log.d("ListValue", s);
+
 
                 if (ans != null) {
                     txt_result.setText(ans);
@@ -535,20 +593,20 @@ public class LoginActivity extends AppCompatActivity {
         CVI.addAll(CVIList);
         C1a.addAll(C1aList);
 
-        averageHR = preferences.getFloat("averageHR", 0);
-        averagePI = preferences.getFloat("averagePI", 0);
-        averageCVI = preferences.getFloat("averageCVI", 0);
-        averageC1a = preferences.getFloat("averageC1a", 0);
-        maxPI = preferences.getFloat("maxPI", 0);
-        maxCVI = preferences.getFloat("maxCVI", 0);
-        maxC1a = preferences.getFloat("maxC1a", 0);
-        minPI = preferences.getFloat("minPI", 0);
-        minCVI = preferences.getFloat("minCVI", 0);
-        minC1a = preferences.getFloat("minC1a", 0);
-        ValueHR = preferences.getFloat("ValueHR", 0);
-        ValuePI = preferences.getFloat("ValuePI", 0);
-        ValueCvi = preferences.getFloat("ValueCvi", 0);
-        ValueC1a = preferences.getFloat("ValueC1a", 0);
+//        averageHR = preferences.getFloat("averageHR", 0);
+//        averagePI = preferences.getFloat("averagePI", 0);
+//        averageCVI = preferences.getFloat("averageCVI", 0);
+//        averageC1a = preferences.getFloat("averageC1a", 0);
+//        maxPI = preferences.getFloat("maxPI", 0);
+//        maxCVI = preferences.getFloat("maxCVI", 0);
+//        maxC1a = preferences.getFloat("maxC1a", 0);
+//        minPI = preferences.getFloat("minPI", 0);
+//        minCVI = preferences.getFloat("minCVI", 0);
+//        minC1a = preferences.getFloat("minC1a", 0);
+//        ValueHR = preferences.getFloat("ValueHR", 0);
+//        ValuePI = preferences.getFloat("ValuePI", 0);
+//        ValueCvi = preferences.getFloat("ValueCvi", 0);
+//        ValueC1a = preferences.getFloat("ValueC1a", 0);
     }
 
     @Override
@@ -569,6 +627,7 @@ public class LoginActivity extends AppCompatActivity {
     @SuppressLint("HandlerLeak")
     public void RecordWaveAction(View view) {
         bt4.Bluetooth_init();
+        txt_result.setText("結果確認");
         if (bt4.isconnect) {
             runOnUiThread(new Runnable() {
                 @Override
@@ -670,11 +729,19 @@ public class LoginActivity extends AppCompatActivity {
                 }
 
                 if (step[0] == 3) {
-                    saveLP4(bt4.file_data);
+//                    initCheck();
+                    if (bt4.file_data.size() > 0) {
+                        saveLP4(bt4.file_data);
+                    } else {
+                        ShowToast("檔案大小為0");
+                    }
+                    bt4.Delete_AllRecor(this);
                 }
 
                 if (step[0] == 4) {
                     bt4.Delete_AllRecor(this);
+                    bt4.file_data.clear();
+                    bt4.Buffer_Array.clear();
                 }
                 step[0]++;
             }
@@ -683,9 +750,9 @@ public class LoginActivity extends AppCompatActivity {
 
     private void saveLP4(ArrayList<Byte> file_data) {
         new Thread(() -> {
-            String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(System.currentTimeMillis());
-            String folderName = "Revlis_ID_Detect"; // 資料夾名稱
-            String fileName = "[" + date + "]revlis.lp4";
+            String date = new SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault()).format(System.currentTimeMillis());
+            String folderName = "Apple_ID_Detect"; // 資料夾名稱
+            String fileName = date + "_888888.lp4";
 
             try {
                 File internalStorageDir = getFilesDir(); // 內部存儲目錄
