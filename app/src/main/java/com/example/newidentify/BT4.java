@@ -626,7 +626,7 @@ public class BT4 {
                                                 isnull = true;
                                             }
                                         }
-                                        if (isnull) {
+                                        if (isnull || !isTenSec) {
                                             for (int i = 0; i < 7; i++) {
                                                 Buffer_Array.remove(0);
                                             }
@@ -640,7 +640,7 @@ public class BT4 {
                                             }
 //                                            Log.d("wwwww", "result = " + result);
 
-                                            if (wave_array.size() >= 7 && isTenSec) {
+                                            if (wave_array.size() >= 7) {
 //                                                Log.d(bluetooth_Tag, "wave_array = " + wave_array.size() + "     bytesAvailable = " + Buffer_Array.size());
                                                 byte[] ecgbyte = new byte[7];
                                                 ecgbyte[0] = wave_array.get(0);

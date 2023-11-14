@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme_Light" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- 其他樣式屬性 -->
+    </style>
+
+</resources>

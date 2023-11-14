@@ -58,6 +58,7 @@ import java.util.Locale;
 import java.util.Map;
 
 public class LoginActivity extends AppCompatActivity {
+
     private SharedPreferences preferences;
     private SharedPreferences.Editor editor;
     /**
@@ -123,7 +124,7 @@ public class LoginActivity extends AppCompatActivity {
     boolean isCountDownRunning = false;
     boolean isDetectOver = false;
     private static final int COUNTDOWN_INTERVAL = 1000;
-    private static final int COUNTDOWN_TOTAL_TIME = 30000;
+    private static final int COUNTDOWN_TOTAL_TIME = 30000; //量測時間
 
     public static ArrayList<Entry> chartSet1Entries = new ArrayList<Entry>();
     public static ArrayList<Double> oldValue = new ArrayList<Double>();
@@ -478,9 +479,48 @@ public class LoginActivity extends AppCompatActivity {
                 txt_value.setText(s);
                 txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit + 1,heartRate.size()));
                 reader.close();
+                deleteCha(path);
+                deleteTxt(path);
             }
         } catch (Exception e) {
             Log.e("catchError", e.toString());
+        }
+    }
+
+    private void deleteCha(String filePath) {
+        String fileCha = ".cha";
+
+        File folder = new File(filePath);
+        File[] files = folder.listFiles();
+
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile() && file.getName().endsWith(fileCha)) {
+                    if (file.delete()) {
+                        System.out.println("Deleted: " + file.getAbsolutePath());
+                    } else {
+                        System.out.println("Failed to delete: " + file.getAbsolutePath());
+                    }
+                }
+            }
+        }
+    }
+    private void deleteTxt(String filePath) {
+        String fileTxt = ".txt";
+
+        File folder = new File(filePath);
+        File[] files = folder.listFiles();
+
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile() && file.getName().endsWith(fileTxt)) {
+                    if (file.delete()) {
+                        System.out.println("Deleted: " + file.getAbsolutePath());
+                    } else {
+                        System.out.println("Failed to delete: " + file.getAbsolutePath());
+                    }
+                }
+            }
         }
     }
 
@@ -522,8 +562,9 @@ public class LoginActivity extends AppCompatActivity {
                 PI.set(heartRate.size() % dataCollectionLimit - 1, ValuePI);
                 CVI.set(heartRate.size() % dataCollectionLimit - 1, ValueCvi);
                 C1a.set(heartRate.size() % dataCollectionLimit - 1, ValueC1a);
+//                saveInfoToPreference();
             } else {
-                newDialog();
+//                newDialog();
             }
         } catch (Exception e) {
             Log.e("super", e.toString());
@@ -572,6 +613,39 @@ public class LoginActivity extends AppCompatActivity {
         dialog.setCanceledOnTouchOutside(false);
     }
 
+//    public void saveInfoToPreference() {
+//
+//        tinyDB.putInt("count", heartRate.size());
+//
+//        // 儲存Map
+//        Gson gson = new Gson();
+//        String dataMapJson = gson.toJson(dataMap);
+//        editor.putString("dataMap", dataMapJson);
+//
+//        tinyDB.putListDouble("heartRate", heartRate);
+//        tinyDB.putListDouble("PI", PI);
+//        tinyDB.putListDouble("CVI", CVI);
+//        tinyDB.putListDouble("C1a", C1a);
+//
+//        // 儲存其他變數
+//        editor.putFloat("averageHR", (float) averageHR);
+//        editor.putFloat("averagePI", (float) averagePI);
+//        editor.putFloat("averageCVI", (float) averageCVI);
+//        editor.putFloat("averageC1a", (float) averageC1a);
+//        editor.putFloat("maxPI", (float) maxPI);
+//        editor.putFloat("maxCVI", (float) maxCVI);
+//        editor.putFloat("maxC1a", (float) maxC1a);
+//        editor.putFloat("minPI", (float) minPI);
+//        editor.putFloat("minCVI", (float) minCVI);
+//        editor.putFloat("minC1a", (float) minC1a);
+//        editor.putFloat("ValueHR", (float) ValueHR);
+//        editor.putFloat("ValuePI", (float) ValuePI);
+//        editor.putFloat("ValueCvi", (float) ValueCvi);
+//        editor.putFloat("ValueC1a", (float) ValueC1a);
+//
+//        editor.apply();
+//    }
+
     public void loadData() {
         count = tinyDB.getInt("count");
         ArrayList<Double> heartRateList = tinyDB.getListDouble("heartRate");
@@ -593,20 +667,20 @@ public class LoginActivity extends AppCompatActivity {
         CVI.addAll(CVIList);
         C1a.addAll(C1aList);
 
-//        averageHR = preferences.getFloat("averageHR", 0);
-//        averagePI = preferences.getFloat("averagePI", 0);
-//        averageCVI = preferences.getFloat("averageCVI", 0);
-//        averageC1a = preferences.getFloat("averageC1a", 0);
-//        maxPI = preferences.getFloat("maxPI", 0);
-//        maxCVI = preferences.getFloat("maxCVI", 0);
-//        maxC1a = preferences.getFloat("maxC1a", 0);
-//        minPI = preferences.getFloat("minPI", 0);
-//        minCVI = preferences.getFloat("minCVI", 0);
-//        minC1a = preferences.getFloat("minC1a", 0);
-//        ValueHR = preferences.getFloat("ValueHR", 0);
-//        ValuePI = preferences.getFloat("ValuePI", 0);
-//        ValueCvi = preferences.getFloat("ValueCvi", 0);
-//        ValueC1a = preferences.getFloat("ValueC1a", 0);
+        averageHR = preferences.getFloat("averageHR", 0);
+        averagePI = preferences.getFloat("averagePI", 0);
+        averageCVI = preferences.getFloat("averageCVI", 0);
+        averageC1a = preferences.getFloat("averageC1a", 0);
+        maxPI = preferences.getFloat("maxPI", 0);
+        maxCVI = preferences.getFloat("maxCVI", 0);
+        maxC1a = preferences.getFloat("maxC1a", 0);
+        minPI = preferences.getFloat("minPI", 0);
+        minCVI = preferences.getFloat("minCVI", 0);
+        minC1a = preferences.getFloat("minC1a", 0);
+        ValueHR = preferences.getFloat("ValueHR", 0);
+        ValuePI = preferences.getFloat("ValuePI", 0);
+        ValueCvi = preferences.getFloat("ValueCvi", 0);
+        ValueC1a = preferences.getFloat("ValueC1a", 0);
     }
 
     @Override
@@ -729,7 +803,6 @@ public class LoginActivity extends AppCompatActivity {
                 }
 
                 if (step[0] == 3) {
-//                    initCheck();
                     if (bt4.file_data.size() > 0) {
                         saveLP4(bt4.file_data);
                     } else {
@@ -752,13 +825,10 @@ public class LoginActivity extends AppCompatActivity {
         new Thread(() -> {
             String date = new SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault()).format(System.currentTimeMillis());
             String folderName = "Apple_ID_Detect"; // 資料夾名稱
-            String fileName = date + "_888888.lp4";
+            String fileName = "g_"+date + "_888888.lp4";
 
             try {
-                File internalStorageDir = getFilesDir(); // 內部存儲目錄
-
-                File folder = new File(internalStorageDir, folderName);
-
+                File folder = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), folderName);
                 // 如果資料夾不存在，建立
                 if (!folder.exists()) {
                     folder.mkdirs();

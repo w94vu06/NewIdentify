@@ -50,6 +50,9 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -66,7 +69,9 @@ public class MainActivity extends AppCompatActivity {
     Button btn_choose, btn_detect, btn_stop;
     TextView txt_file, txt_result, txt_value, txt_count;
 
-    /** choose Device Dialog*/
+    /**
+     * choose Device Dialog
+     */
 
     Dialog deviceDialog;
 
@@ -297,12 +302,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 //找外部儲存
-//                String externalStorageDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
-                File obbDir = new File(Environment.getExternalStorageDirectory() + "/Android/obb/" + getPackageName());
+                String externalStorageDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
+//                File obbDir = new File(Environment.getExternalStorageDirectory() + "/Android/obb/" + getPackageName());
 
                 chooserDialog = new ChooserDialog(MainActivity.this)
-//                        .withStartFile(String.valueOf(externalStorageDirectory + "/Apple_ID_Detect"))
-                        .withStartFile(String.valueOf(obbDir))
+//                        .withStartFile(String.valueOf(obbDir))
+                        .withStartFile(String.valueOf(externalStorageDirectory + "/Apple_ID_Detect"))
                         .withOnCancelListener(new DialogInterface.OnCancelListener() {
                             @Override
                             public void onCancel(DialogInterface dialogInterface) {
@@ -315,10 +320,8 @@ public class MainActivity extends AppCompatActivity {
                                 filePath = dir;
                                 File file = new File(dir);
                                 fileName = file.getName();
-
                                 path = filePath.substring(0, filePath.length() - fileName.length());
                                 txt_file.setText(fileName);
-
                                 initCheck();
                             }
                         })
@@ -341,6 +344,9 @@ public class MainActivity extends AppCompatActivity {
         thread.start();
     }
 
+    /**
+     * 裝置選擇Dialog
+     **/
     public void initDeviceDialog() {
         deviceDialog.setContentView(R.layout.dialog_device);
         // 初始化元件
@@ -378,7 +384,6 @@ public class MainActivity extends AppCompatActivity {
         deviceDialog.show();
     }
 
-
     /**
      * ID識別按鈕事件
      **/
@@ -408,8 +413,6 @@ public class MainActivity extends AppCompatActivity {
         int x = anaEcgFile(fileName, path);
         if (x == 1) {
             txt_result.setText("檔案訊號error");
-        } else {
-//            ccccc += 1;
         }
         filePath = path;
         fileName = fileName.substring(0, fileName.length() - 4);
@@ -470,10 +473,49 @@ public class MainActivity extends AppCompatActivity {
                 txt_value.setText(s);
                 txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, heartRate.size()));
                 reader.close();
+                deleteCha(path);
+                deleteTxt(path);
             }
         } catch (Exception e) {
             ShowToast("訊號品質不好，請重新量測");
             Log.e("catchError", e.toString());
+        }
+    }
+
+    private void deleteCha(String filePath) {
+        String fileCha = ".cha";
+
+        File folder = new File(filePath);
+        File[] files = folder.listFiles();
+
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile() && file.getName().endsWith(fileCha)) {
+                    if (file.delete()) {
+                        System.out.println("Deleted: " + file.getAbsolutePath());
+                    } else {
+                        System.out.println("Failed to delete: " + file.getAbsolutePath());
+                    }
+                }
+            }
+        }
+    }
+    private void deleteTxt(String filePath) {
+        String fileTxt = ".txt";
+
+        File folder = new File(filePath);
+        File[] files = folder.listFiles();
+
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile() && file.getName().endsWith(fileTxt)) {
+                    if (file.delete()) {
+                        System.out.println("Deleted: " + file.getAbsolutePath());
+                    } else {
+                        System.out.println("Failed to delete: " + file.getAbsolutePath());
+                    }
+                }
+            }
         }
     }
 
@@ -549,7 +591,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void loadData() {
         int count = tinyDB.getInt("count");
-        txt_count.setText("目前已註冊"+count+"筆資料\n 如開始量測將會覆蓋此資料");
+        txt_count.setText("目前已註冊" + count + "筆資料\n 如開始量測將會覆蓋此資料");
     }
 
     public static void DrawChart(byte[] result) {
@@ -581,29 +623,26 @@ public class MainActivity extends AppCompatActivity {
                         oldValue = temp_old;
                     }
 
-                    if (bt4.isTenSec) {
-                        oldValue.add((double) ch4);
+                    oldValue.add((double) ch4);
 
-                        double nvalue = (oldValue.get(oldValue.size() - 1));
+                    double nvalue = (oldValue.get(oldValue.size() - 1));
 
-                        if (oldValue.size() > 1) {
-                            nvalue = Butterworth(oldValue);
-                        }
-                        Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
-                        chartSet1Entries.add(chartSet1Entrie);
-                        chartSet1.setValues(chartSet1Entries);
-                        lineChart.setData(new LineData(chartSet1));
-                        lineChart.setVisibleXRangeMinimum(300);
-                        lineChart.invalidate();
+                    if (oldValue.size() > 1) {
+                        nvalue = Butterworth(oldValue);
                     }
+                    Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
+                    chartSet1Entries.add(chartSet1Entrie);
+                    chartSet1.setValues(chartSet1Entries);
+                    lineChart.setData(new LineData(chartSet1));
+                    lineChart.setVisibleXRangeMinimum(300);
+                    lineChart.invalidate();
+
                 }
             });
         } catch (Exception ex) {
 //            Log.d("wwwww", "eeeeeerrr = " + ex.toString());
         }
     }
-
-
 
 
     public static int getStreamLP(int NewSample) {
@@ -835,7 +874,7 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             String date = new SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault()).format(System.currentTimeMillis());
             String folderName = "Apple_ID_Detect"; // 資料夾名稱
-            String s = date + "_888888.lp4";
+            String s = "r_" + date + "_888888.lp4";
 
             try {
                 File folder = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), folderName);
@@ -862,7 +901,6 @@ public class MainActivity extends AppCompatActivity {
                 MediaScannerConnection.scanFile(this, new String[]{fileLocation.getAbsolutePath()}, null, null);
                 String savedFilePath = fileLocation.getAbsolutePath();
                 ShowToast("檔案已儲存");
-                Log.d("gggg", "saveLP4: " + savedFilePath);
                 setChooseFile(savedFilePath);
 
             } catch (IOException e) {
@@ -870,24 +908,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
-
-    public void saveByte(ArrayList<Byte> byteArrayList) {
-        // 將 ArrayList<Byte> 轉換為 byte 數組
-        byte[] byteArray = new byte[byteArrayList.size()];
-        for (int i = 0; i < byteArrayList.size(); i++) {
-            byteArray[i] = byteArrayList.get(i);
-        }
-    }
-
-    public void backByte(byte[] byteArray) {
-        // 將 byte 數組轉換為 ArrayList<Byte>
-        ArrayList<Byte> byteArrayList = new ArrayList<>();
-        for (byte b : byteArray) {
-            byteArrayList.add(b);
-        }
-    }
-
-    private static final int PICK_PDF_FILE = 2;
 
     public void setChooseFile(String Apath) {
 
@@ -914,6 +934,22 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+    }
+
+    public void saveByte(ArrayList<Byte> byteArrayList) {
+        // 將 ArrayList<Byte> 轉換為 byte 數組
+        byte[] byteArray = new byte[byteArrayList.size()];
+        for (int i = 0; i < byteArrayList.size(); i++) {
+            byteArray[i] = byteArrayList.get(i);
+        }
+    }
+
+    public void backByte(byte[] byteArray) {
+        // 將 byte 數組轉換為 ArrayList<Byte>
+        ArrayList<Byte> byteArrayList = new ArrayList<>();
+        for (byte b : byteArray) {
+            byteArrayList.add(b);
+        }
     }
 
 
