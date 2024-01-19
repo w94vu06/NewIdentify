@@ -1,8 +1,6 @@
 package com.example.newidentify;
 
 
-import static android.content.Context.BLUETOOTH_SERVICE;
-
 //import static com.example.newidentify.MainActivity.txt_BleStatus;
 //import static com.example.newidentify.MainActivity.DrawChart;
 //import static com.example.newidentify.MainActivity.ShowToast;
@@ -10,12 +8,12 @@ import static android.content.Context.BLUETOOTH_SERVICE;
 //import static com.example.newidentify.MainActivity.txt_countDown;
 
 
-import static com.example.newidentify.LoginActivity.DrawChart1;
 import static com.example.newidentify.MainActivity.DrawChart;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -31,23 +29,25 @@ import android.content.Intent;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 
 import java.util.ArrayList;
-import java.util.List;
+        import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 
 
 @SuppressLint("MissingPermission")
-public class BT4 {
+public class BT4 extends Service {
 
     private final Activity global_activity;
 
@@ -78,7 +78,7 @@ public class BT4 {
     public ArrayList<Byte> file_data = new ArrayList<Byte>();
 
     //判斷是否連線
-    public boolean isconnect = false;
+    public boolean isConnected = false;
     public boolean alreadyscan = false;
     public boolean isTenSec = false;
 
@@ -90,7 +90,7 @@ public class BT4 {
     BluetoothManager mBluetoothManager;
     BluetoothAdapter mBluetoothAdapter;
     public ArrayList<BluetoothDevice> mBluetoothDevices = new ArrayList<BluetoothDevice>();
-    String deviceName = "";
+    public String deviceName = "";
 
     //詢問檔案筆數
     public int ECG_Count = 0;
@@ -99,9 +99,9 @@ public class BT4 {
 
 
     public void Bluetooth_init() {
-        int permission1 = ActivityCompat.checkSelfPermission(global_activity, Manifest.permission.ACCESS_FINE_LOCATION);
+        int permission = ActivityCompat.checkSelfPermission(global_activity, Manifest.permission.ACCESS_FINE_LOCATION);
 
-        if (permission1 != 0) {
+        if (permission != 0) {
             ActivityCompat.requestPermissions(global_activity,
                     new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT},
                     350
@@ -109,8 +109,8 @@ public class BT4 {
         } else {
             Log.d(bluetooth_Tag, "alreadyscan = " + alreadyscan);
             //搜尋
-            if (!isconnect) {
-                Log.d(bluetooth_Tag, "isconnect  sss= " + isconnect);
+            if (!isConnected) {
+                Log.d(bluetooth_Tag, "isconnect  sss= " + isConnected);
                 startScan();
                 LocationManager locationManager = (LocationManager) global_activity.getSystemService(Context.LOCATION_SERVICE);
                 if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -153,7 +153,7 @@ public class BT4 {
                         //如沒重複則添加到bluetoothdevices中
                         if (device.getName() != null) {
                             mBluetoothDevices.add(device);
-                            if (device.getName().toString().equals(deviceName)) {
+                            if (device.getName().equals(deviceName)) {
                                 String intentAction;
                                 intentAction = BLE_TRY_CONNECT;
                                 broadcastUpdate(intentAction);
@@ -218,14 +218,14 @@ public class BT4 {
 
             switch (newState) {
                 case BluetoothProfile.STATE_CONNECTED:
-                    Log.d("xxxxx", "STATE_CONNECTED  isConnect = " + isconnect);
+                    Log.d("xxxxx", "STATE_CONNECTED  isConnect = " + isConnected);
                     mBluetoothGatt.discoverServices();
                     break;
                 case BluetoothProfile.STATE_DISCONNECTED:
                     Log.d("xxxxx", "STATE_DISCONNECTED");
                     mBluetoothAdapter.startLeScan(mLeScanCallback);//開始搜尋BLE設備
                     mBluetoothDevices.clear();
-                    isconnect = false;
+                    isConnected = false;
                     mBluetoothGatt.close();
                     close();
                     break;
@@ -259,7 +259,7 @@ public class BT4 {
             descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
             mBluetoothGatt.writeDescriptor(descriptor);
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
-            isconnect = true;
+            isConnected = true;
             String intentAction;
             intentAction = BLE_CONNECTED;
             broadcastUpdate(intentAction);
@@ -405,9 +405,7 @@ public class BT4 {
 
         byte[] send = {(byte) 0xaa, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //        new byte[]
-        for (int i = 0; i < cmd.length; i++) {
-            send[i + 2] = cmd[i];
-        }
+        System.arraycopy(cmd, 0, send, 2, cmd.length);
         writeBLE(send, new Handler() {
             @Override
             public void handleMessage(Message msg2) {
@@ -574,7 +572,7 @@ public class BT4 {
 
 
     @SuppressLint("HandlerLeak")
-    public void Wave(boolean isRecord, final Handler read_handler) {
+    public void startWave(boolean isRecord, final Handler read_handler) {
         try {
             Log.d("wwwww", "SSS11111");
             isWave = true;
@@ -624,6 +622,7 @@ public class BT4 {
                                         for (int i = 0; i < 7; i++) {
                                             if (Buffer_Array.get(i) == null) {
                                                 isnull = true;
+                                                break;
                                             }
                                         }
                                         if (isnull || !isTenSec) {
@@ -650,7 +649,7 @@ public class BT4 {
                                                 ecgbyte[4] = wave_array.get(4);
                                                 ecgbyte[5] = wave_array.get(5);
                                                 ecgbyte[6] = wave_array.get(6);
-                                                String valid = Integer.toString((wave_array.get(0) & 0xff) + 0x100, 16).substring(1) + "" + Integer.toString((wave_array.get(1) & 0xff) + 0x100, 16).substring(1);
+                                                String valid = Integer.toString((wave_array.get(0) & 0xff) + 0x100, 16).substring(1) + Integer.toString((wave_array.get(1) & 0xff) + 0x100, 16).substring(1);
 
                                                 wave_array.remove(0);
                                                 wave_array.remove(0);
@@ -662,15 +661,13 @@ public class BT4 {
 
                                                 if (valid.equals("aaa0") && isTenSec) {
                                                     DrawChart(ecgbyte);
-                                                    DrawChart1(ecgbyte);
-//                                                    Log.d("wwwww", "畫圖");
                                                 }
                                             }
                                         }
                                     }
                                 }//try
                                 catch (Exception e) {
-                                    Log.d(bluetooth_Tag, "exxxxx = " + e.toString());
+                                    Log.d(bluetooth_Tag, "exxxxx = " + e);
                                     e.printStackTrace();
                                 }
                                 SystemClock.sleep(10);
@@ -701,7 +698,7 @@ public class BT4 {
                 for (int i = 2; i < 514; i++) {
                     if (file_data.size() < File_Count) {
                         file_data.add(Buffer_Array.get(i));
-                        Log.d("bbbb", "handleMessage: " + Buffer_Array.get(i));
+
                     }
                 }
 
@@ -784,7 +781,7 @@ public class BT4 {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }
         mBluetoothGatt.disconnect();
-        isconnect = false;
+        isConnected = false;
 
         global_activity.runOnUiThread(new Runnable() {
             @Override
@@ -803,6 +800,11 @@ public class BT4 {
     }
 
 
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
 }
 
 

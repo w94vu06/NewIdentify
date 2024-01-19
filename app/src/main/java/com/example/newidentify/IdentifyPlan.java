@@ -2,13 +2,7 @@ package com.example.newidentify;
 
 import android.util.Log;
 
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-
-import java.util.ArrayList;
-
-public class identifyPlan {
+public class IdentifyPlan {
     double aUpper,aLower,pUpper,pLower,cviUpper,cviLower,c1aUpper,c1aLower;
 
     public String First(double averageHR, double HR, double averagePI, double PI, double averageCvi, double Cvi, double averageC1a, double C1a){

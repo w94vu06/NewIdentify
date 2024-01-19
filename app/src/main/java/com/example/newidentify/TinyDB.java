@@ -21,15 +21,6 @@
 
 package com.example.newidentify;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Map;
-
-//import com.google.gson.Gson;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -40,11 +31,21 @@ import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.google.gson.Gson;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
 
 public class TinyDB {
 
-    private Context context;
-    private SharedPreferences preferences;
+    private final Context context;
+    private final SharedPreferences preferences;
     private String DEFAULT_APP_IMAGEDATA_DIRECTORY;
     private String lastImagePath = "";
 
@@ -264,6 +265,23 @@ public class TinyDB {
     }
 
     /**
+     * Get parsed ArrayList of Float from SharedPreferences at 'key'
+     * @param key SharedPreferences key
+     * @return ArrayList of Float
+     */
+    public ArrayList<Float> getListFloat(String key) {
+        String[] myList = TextUtils.split(preferences.getString(key, ""), "‚‗‚");
+        ArrayList<String> arrayToList = new ArrayList<>(Arrays.asList(myList));
+        ArrayList<Float> newList = new ArrayList<>();
+
+        for (String item : arrayToList)
+            newList.add(Float.parseFloat(item));
+
+        return newList;
+    }
+
+
+    /**
      * Get parsed ArrayList of Integers from SharedPreferences at 'key'
      * @param key SharedPreferences key
      * @return ArrayList of Longs
@@ -428,6 +446,18 @@ public class TinyDB {
     }
 
     /**
+     * Put ArrayList of Float into SharedPreferences with 'key' and save
+     * @param key SharedPreferences key
+     * @param floatList ArrayList of Float to be added
+     */
+    public void putListFloat(String key, List<Float> floatList) {
+        checkForNullKey(key);
+        Float[] myFloatList = floatList.toArray(new Float[floatList.size()]);
+        preferences.edit().putString(key, TextUtils.join("‚‗‚", myFloatList)).apply();
+    }
+
+
+    /**
      * Put String value into SharedPreferences with 'key' and save
      * @param key SharedPreferences key
      * @param value String value to be added
@@ -483,21 +513,21 @@ public class TinyDB {
      * @param key SharedPreferences key
      * @param obj is the Object you want to put 
      */
-//    public void putObject(String key, Object obj){
-//    	checkForNullKey(key);
-//    	Gson gson = new Gson(); 
-//    	putString(key, gson.toJson(obj));
-//    }
-//    
-//    public void putListObject(String key, ArrayList<Object> objArray){
-//    	checkForNullKey(key); 
-//    	Gson gson = new Gson(); 
-//    	ArrayList<String> objStrings = new ArrayList<String>();
-//    	for(Object obj : objArray){
-//    		objStrings.add(gson.toJson(obj));
-//    	}
-//    	putListString(key, objStrings);
-//    }
+    public void putObject(String key, Object obj){
+    	checkForNullKey(key);
+    	Gson gson = new Gson();
+    	putString(key, gson.toJson(obj));
+    }
+
+    public void putListObject(String key, ArrayList<Object> objArray){
+    	checkForNullKey(key);
+    	Gson gson = new Gson();
+    	ArrayList<String> objStrings = new ArrayList<String>();
+    	for(Object obj : objArray){
+    		objStrings.add(gson.toJson(obj));
+    	}
+    	putListString(key, objStrings);
+    }
     
     /**
      * Remove SharedPreferences item with 'key'
@@ -579,11 +609,7 @@ public class TinyDB {
      */
     public boolean objectExists(String key){
         String gottenString = getString(key);
-        if(gottenString.isEmpty()){
-            return false;
-        }else {
-            return true;
-        }
+        return !gottenString.isEmpty();
 
     }
     

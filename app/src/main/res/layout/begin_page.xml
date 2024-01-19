@@ -12,27 +12,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center">
-        <Button
-            android:id="@+id/btn_login"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/shape_button"
-            android:fontFamily="@font/glowsanssc_condensed_book"
-            android:minHeight="0dp"
-            android:paddingLeft="40dp"
-            android:paddingRight="40dp"
-            android:text="登入"
-            android:textColor="@color/gray"
-            android:textSize="20sp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.523" />
-
-        <Space
-            android:layout_width="@dimen/dp_50"
-            android:layout_height="wrap_content"/>
 
 
         <Button
@@ -44,7 +23,7 @@
             android:minHeight="0dp"
             android:paddingLeft="40dp"
             android:paddingRight="40dp"
-            android:text="註冊"
+            android:text="量測"
             android:textColor="@color/gray"
             android:textSize="20sp"
             app:layout_constraintBottom_toBottomOf="parent"

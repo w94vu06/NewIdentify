@@ -29,19 +29,12 @@ public class BeginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.begin_page);
 
-        btn_login = findViewById(R.id.btn_login);
+//        btn_login = findViewById(R.id.btn_login);
         btn_signUp = findViewById(R.id.btn_signUp);
         btn_clear_lp4 = findViewById(R.id.btn_clear_lp4);
         initPermission();
         Intent it = new Intent();
 
-        btn_login.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                it.setClass(BeginActivity.this, LoginActivity.class);
-                startActivity(it);
-            }
-        });
 
         btn_signUp.setOnClickListener(new View.OnClickListener() {
             @Override

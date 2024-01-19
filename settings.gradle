@@ -16,5 +16,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NewIdentify"
+rootProject.name = "MidiffIdentify"
 include ':app'

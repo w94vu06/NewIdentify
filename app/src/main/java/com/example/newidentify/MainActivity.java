@@ -1,6 +1,8 @@
 package com.example.newidentify;
 
+import static com.example.newidentify.processData.SignalProcess.Butterworth;
 import static java.lang.Math.abs;
+import static java.lang.Math.getExponent;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -19,12 +21,14 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.MediaScannerConnection;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.os.StrictMode;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
@@ -35,30 +39,32 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.newidentify.Util.ChartSetting;
+import com.example.newidentify.Util.CleanFile;
+import com.example.newidentify.processData.BpmCountThread;
+import com.example.newidentify.processData.DecodeCHAFile;
+import com.example.newidentify.processData.SignalProcess;
 import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.listener.BarLineChartTouchListener;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.obsez.android.lib.filechooser.ChooserDialog;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+
 
 public class MainActivity extends AppCompatActivity {
     private SharedPreferences preferences;
@@ -66,8 +72,8 @@ public class MainActivity extends AppCompatActivity {
     /**
      * UI
      **/
-    Button btn_choose, btn_detect, btn_stop;
-    TextView txt_file, txt_result, txt_value, txt_count;
+    Button btn_detect, btn_stop_clean;
+    TextView txt_fileName, txt_result;
 
     /**
      * choose Device Dialog
@@ -75,26 +81,27 @@ public class MainActivity extends AppCompatActivity {
 
     Dialog deviceDialog;
 
-
     /**
      * Parameter
      **/
-    private String path, filePath, fileName, ans, readTxt;
-    private int dataCollectionLimit = 5;//設定檔案收集數量，最高20
-    private int ccccc;
-    private Boolean checkX;
+    private String fileName;
+    private String filePath;
+    private String path;
+
+    private String getfileName;
+    private String getFilePath = "";
+    private final int dataCollectionLimit = 5;//設定檔案收集數量，最高20
     private ChooserDialog chooserDialog; //檔案選擇器
-    private Map<String, String> dataMap = new HashMap<>();
-    private ArrayList<Double> heartRate = new ArrayList<>();
-    private ArrayList<Double> PI = new ArrayList<>();
-    private ArrayList<Double> CVI = new ArrayList<>();
-    private ArrayList<Double> C1a = new ArrayList<>();
+    private final Map<String, String> dataMap = new HashMap<>();
+    private final ArrayList<Double> heartRate = new ArrayList<>();
+    private final ArrayList<Double> PI = new ArrayList<>();
+    private final ArrayList<Double> CVI = new ArrayList<>();
+    private final ArrayList<Double> C1a = new ArrayList<>();
+    private static final ArrayList<Float> saveWaveData = new ArrayList<>();
     double averageHR, averagePI, averageCVI, averageC1a;
     double maxPI, maxCVI, maxC1a;
     double minPI, minCVI, minC1a;
     double ValueHR, ValuePI, ValueCvi, ValueC1a;
-
-    identifyPlan identifyPlan = new identifyPlan();
 
     // Used to load the 'newidentify' library on application startup.
     static {
@@ -112,20 +119,23 @@ public class MainActivity extends AppCompatActivity {
     public static TextView txt_BleStatus;
     //    public static TextView Percent_Text;
     public static LineChart lineChart;
+    public static LineChart chart_df;
+    private ChartSetting chartSetting;
     ///////////////////////
     //////畫心電圖使用///////
     //////////////////////
-    private Handler countDownHandler = new Handler();
+    private final Handler countDownHandler = new Handler();
     private boolean isToastShown = false;
     public CountDownTimer countDownTimer;//倒數
     boolean isCountDownRunning = false;
-    boolean isDetectOver = false;
+    boolean isMeasurementOver = false;
     private static final int COUNTDOWN_INTERVAL = 1000;
     private static final int COUNTDOWN_TOTAL_TIME = 30000;
 
     public static ArrayList<Entry> chartSet1Entries = new ArrayList<Entry>();
     public static ArrayList<Double> oldValue = new ArrayList<Double>();
     public static LineDataSet chartSet1 = new LineDataSet(null, "");
+
     static double[] mX = {0.0, 0.0, 0.0, 0.0, 0.0};
     static double[] mY = {0.0, 0.0, 0.0, 0.0, 0.0};
     static int[] mStreamBuf = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
@@ -139,40 +149,52 @@ public class MainActivity extends AppCompatActivity {
             5.06799838673418980000,
             -3.11596692520174570000,
             0.71991032729187143000};
+    /**
+     * L2D
+     */
+    private DecodeCHAFile decodeCHAFile;
+    private SignalProcess signalProcess;
+    private BpmCountThread bpmCountThread;
+    private CleanFile cleanFile;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        //初始化SharedPreference
         preferences = getSharedPreferences("my_preferences", MODE_PRIVATE);
         editor = preferences.edit();
+
         global_activity = this;
         bt4 = new BT4(global_activity);
-        tinyDB = new TinyDB(this);
+        tinyDB = new TinyDB(global_activity);
         deviceDialog = new Dialog(global_activity);
+        signalProcess = new SignalProcess();
+        cleanFile = new CleanFile();
+        chartSetting = new ChartSetting();
         lineChart = findViewById(R.id.linechart);
-        initchart();
-        initObject();
-        initPermission();
-        checkStorageManagerPermission();
+        chart_df = findViewById(R.id.chart_df);
 
-        initDeviceDialog();
+        initchart();//初始化圖表
+        initObject();//初始化物件
+        initPermission();//檢查權限
+        checkStorageManagerPermission();//檢查儲存權限
+        initDeviceDialog();//裝置選擇Dialog
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        initChooser();
         initBroadcast();
         setScreenOn();
-        loadData();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         if (countDownTimer != null) {
-            stopCountdownWave();
+            stopCountdownWaveMeasurement();
         }
     }
 
@@ -180,14 +202,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         setScreenOff();
-        if (bt4.isconnect) {
+        if (bt4.isConnected) {
             bt4.close();
         }
         unregisterReceiver(getReceiver);
-        stopCountdownWave();
+        stopCountdownWaveMeasurement();
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private void initBroadcast() {
+        //註冊廣播過濾
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BT4.BLE_CONNECTED);
         intentFilter.addAction(BT4.BLE_TRY_CONNECT);
@@ -227,31 +251,54 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initObject() {
-        btn_stop = findViewById(R.id.btn_stop);
+        btn_stop_clean = findViewById(R.id.btn_stop_clean);
         btn_detect = findViewById(R.id.btn_detect);
-        btn_choose = findViewById(R.id.btn_choose);
-        txt_file = findViewById(R.id.txt_file);
+        txt_fileName = findViewById(R.id.txt_fileName);
         txt_result = findViewById(R.id.txt_result);
-        txt_value = findViewById(R.id.txt_value);
-        txt_count = findViewById(R.id.txt_count);
         txt_countDown = findViewById(R.id.txt_countDown);
         txt_BleStatus = findViewById(R.id.txt_BleStatus);
-        try {
-            File file = new File(filePath);
-            if (file.mkdir()) {
-                System.out.println("新增資料夾");
-            } else {
-                System.out.println("資料夾已存在");
-            }
-        } catch (Exception e) {
-            Log.e("where", e.toString());
-        }
-        btn_stop.setOnClickListener(new View.OnClickListener() {
+
+        btn_stop_clean.setOnClickListener(view -> stopCountdownWaveMeasurement());//停止量測Btn
+    }
+
+    /**
+     * 初始化裝置選擇Dialog
+     **/
+    public void initDeviceDialog() {
+        deviceDialog.setContentView(R.layout.dialog_device);
+        // 初始化元件
+        RadioGroup devicesRadioGroup = deviceDialog.findViewById(R.id.devicesRadioGroup);
+        RadioButton radioButtonDevice1 = deviceDialog.findViewById(R.id.radioButtonDevice1);
+        RadioButton radioButtonDevice2 = deviceDialog.findViewById(R.id.radioButtonDevice2);
+        Button completeButton = deviceDialog.findViewById(R.id.completeButton);
+        deviceDialog.setCancelable(false);
+
+        // 設置按鈕點擊監聽器
+        completeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                stopCountdownWave();
+                // 在這裡處理完成按鈕的點擊事件
+                // 檢查哪個 RadioButton 被選中
+                int checkedRadioButtonId = devicesRadioGroup.getCheckedRadioButtonId();
+                if (checkedRadioButtonId == R.id.radioButtonDevice1) {
+                    bt4.deviceName = "CmateH";
+                    bt4.Bluetooth_init();
+                    deviceDialog.dismiss();
+
+                } else if (checkedRadioButtonId == R.id.radioButtonDevice2) {
+                    bt4.deviceName = "WTK230";
+                    bt4.Bluetooth_init();
+                    deviceDialog.dismiss();
+                    // 處理選中 Device 2 的邏輯
+                } else {
+                    // 提示用戶選擇一個裝置
+                    Toast.makeText(global_activity, "請選擇一個裝置", Toast.LENGTH_SHORT).show();
+                }
             }
         });
+
+        // 顯示對話框
+        deviceDialog.show();
     }
 
     /**
@@ -294,304 +341,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * 檔案選擇器
-     **/
-    public void initChooser() {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                //找外部儲存
-                String externalStorageDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
-//                File obbDir = new File(Environment.getExternalStorageDirectory() + "/Android/obb/" + getPackageName());
-
-                chooserDialog = new ChooserDialog(MainActivity.this)
-//                        .withStartFile(String.valueOf(obbDir))
-                        .withStartFile(String.valueOf(externalStorageDirectory + "/Apple_ID_Detect"))
-                        .withOnCancelListener(new DialogInterface.OnCancelListener() {
-                            @Override
-                            public void onCancel(DialogInterface dialogInterface) {
-                                dialogInterface.cancel();
-                            }
-                        })
-                        .withChosenListener(new ChooserDialog.Result() {
-                            @Override
-                            public void onChoosePath(String dir, File dirFile) {
-                                filePath = dir;
-                                File file = new File(dir);
-                                fileName = file.getName();
-                                path = filePath.substring(0, filePath.length() - fileName.length());
-                                txt_file.setText(fileName);
-                                initCheck();
-                            }
-                        })
-                        .withOnBackPressedListener(dialog -> chooserDialog.goBack())
-                        .withOnLastBackPressedListener(dialog -> dialog.cancel());
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        btn_choose.setOnClickListener(new View.OnClickListener() {
-                            @Override
-                            public void onClick(View v) {
-                                chooserDialog.build();
-                                chooserDialog.show();
-                            }
-                        });
-                    }
-                });
-            }
-        });
-        thread.start();
-    }
-
-    /**
-     * 裝置選擇Dialog
-     **/
-    public void initDeviceDialog() {
-        deviceDialog.setContentView(R.layout.dialog_device);
-        // 初始化元件
-        RadioGroup devicesRadioGroup = deviceDialog.findViewById(R.id.devicesRadioGroup);
-        RadioButton radioButtonDevice1 = deviceDialog.findViewById(R.id.radioButtonDevice1);
-        RadioButton radioButtonDevice2 = deviceDialog.findViewById(R.id.radioButtonDevice2);
-        Button completeButton = deviceDialog.findViewById(R.id.completeButton);
-        deviceDialog.setCancelable(false);
-
-        // 設置按鈕點擊監聽器
-        completeButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // 在這裡處理完成按鈕的點擊事件
-                // 檢查哪個 RadioButton 被選中
-                int checkedRadioButtonId = devicesRadioGroup.getCheckedRadioButtonId();
-                if (checkedRadioButtonId == R.id.radioButtonDevice1) {
-                    bt4.deviceName = "CmateH";
-                    bt4.Bluetooth_init();
-                    deviceDialog.dismiss();
-
-                } else if (checkedRadioButtonId == R.id.radioButtonDevice2) {
-                    bt4.deviceName = "WTK230";
-                    bt4.Bluetooth_init();
-                    deviceDialog.dismiss();
-                    // 處理選中 Device 2 的邏輯
-                } else {
-                    // 提示用戶選擇一個裝置
-                    Toast.makeText(global_activity, "請選擇一個裝置", Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-
-        // 顯示對話框
-        deviceDialog.show();
-    }
-
-    /**
-     * ID識別按鈕事件
-     **/
-    private void initCheck() {
-        if (fileName != null) {
-            if (fileName.endsWith(".lp4")) {
-                decpEcgFile(filePath);
-
-                int u = fileName.length();
-                String j = fileName.substring(0, u - 4);
-                fileName = j + ".cha";
-                initIdentify();
-            } else if (fileName.endsWith(".cha") | fileName.endsWith(".CHA")) {
-                initIdentify();
-            } else {
-                txt_result.setText("不支援此檔案類型");
-            }
-        } else {
-            txt_result.setText("尚未選擇檔案");
-        }
-    }
-
-    /**
-     * 執行c++檔
-     **/
-    private void initIdentify() {
-        int x = anaEcgFile(fileName, path);
-        if (x == 1) {
-            txt_result.setText("檔案訊號error");
-        }
-        filePath = path;
-        fileName = fileName.substring(0, fileName.length() - 4);
-        try {
-            File file = new File(filePath + "/r_" + fileName + ".txt");
-            if (file.isFile() && file.exists()) {
-                BufferedReader reader = new BufferedReader(new FileReader(file));
-                String line;
-                while ((line = reader.readLine()) != null) {
-//                    txt_result.setText(line);
-                    readTxt = line;
-                }
-                String[] parts = readTxt.split(",");
-
-                for (String part : parts) {
-                    String[] nameValue = part.split(":");
-                    if (nameValue.length == 2) {
-                        String name = nameValue[0];
-                        String value = nameValue[1];
-                        dataMap.put(name, value);
-                    }
-                }
-                ValueHR = Double.parseDouble(dataMap.get("Average"));
-                ValuePI = Double.parseDouble(dataMap.get("PI"));
-                ValueCvi = Double.parseDouble(dataMap.get("CVI"));
-                ValueC1a = Double.parseDouble(dataMap.get("C1a"));
-                if (ValueHR > 50 && ValueHR < 150) {
-                    if (heartRate.size() < dataCollectionLimit) {//如果數據數小於dataCollectionLimit就繼續收集
-                        heartRate.add(ValueHR);//把LP4算好的結果加進List
-                        PI.add(ValuePI);
-                        CVI.add(ValueCvi);
-                        C1a.add(ValueC1a);
-                        getValue();
-                    }
-                } else {
-//                    ccccc -= 1;
-                    ShowToast("訊號品質不好，請重新量測");
-                }
-                if (heartRate.size() == dataCollectionLimit) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            ShowToast("註冊成功...");
-                            saveInfoToPreference();
-                            signUpDialog();
-                        }
-                    });
-                }
-                String s = String.format("HR: %s \n PI: %s \n CVI: %s \n C1a: %s", heartRate.toString(), PI.toString(), CVI.toString(), C1a.toString());
-                Log.d("getListSize", "HR" + String.valueOf(heartRate.size()));
-                Log.d("getListSize", "DC" + dataCollectionLimit);
-                Log.d("ListValue", s);
-                if (ans != null) {
-                    txt_result.setText(ans);
-                } else {
-                    txt_result.setText("檔案數量不足");
-                }
-                txt_value.setText(s);
-                txt_count.setText(String.format("目前設定的檔案數量: %d\n輸入檔案數量: %d", dataCollectionLimit, heartRate.size()));
-                reader.close();
-                deleteCha(path);
-                deleteTxt(path);
-            }
-        } catch (Exception e) {
-            ShowToast("訊號品質不好，請重新量測");
-            Log.e("catchError", e.toString());
-        }
-    }
-
-    private void deleteCha(String filePath) {
-        String fileCha = ".cha";
-
-        File folder = new File(filePath);
-        File[] files = folder.listFiles();
-
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile() && file.getName().endsWith(fileCha)) {
-                    if (file.delete()) {
-                        System.out.println("Deleted: " + file.getAbsolutePath());
-                    } else {
-                        System.out.println("Failed to delete: " + file.getAbsolutePath());
-                    }
-                }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 350) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("wwwww", "搜尋設備");
             }
         }
-    }
-    private void deleteTxt(String filePath) {
-        String fileTxt = ".txt";
-
-        File folder = new File(filePath);
-        File[] files = folder.listFiles();
-
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile() && file.getName().endsWith(fileTxt)) {
-                    if (file.delete()) {
-                        System.out.println("Deleted: " + file.getAbsolutePath());
-                    } else {
-                        System.out.println("Failed to delete: " + file.getAbsolutePath());
-                    }
-                }
-            }
-        }
-    }
-
-    private void getValue() {//算各項數值的平均值
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            averageHR = heartRate.stream().mapToDouble(Double::valueOf).average().getAsDouble();
-            averagePI = PI.stream().mapToDouble(Double::valueOf).average().getAsDouble();
-            maxPI = PI.stream().mapToDouble(Double::valueOf).max().getAsDouble();
-            minPI = PI.stream().mapToDouble(Double::valueOf).min().getAsDouble();
-            averageCVI = CVI.stream().mapToDouble(Double::valueOf).average().getAsDouble();
-            maxCVI = CVI.stream().mapToDouble(Double::valueOf).max().getAsDouble();
-            minCVI = CVI.stream().mapToDouble(Double::valueOf).min().getAsDouble();
-            averageC1a = C1a.stream().mapToDouble(Double::valueOf).average().getAsDouble();
-            maxC1a = C1a.stream().mapToDouble(Double::valueOf).max().getAsDouble();
-            minC1a = C1a.stream().mapToDouble(Double::valueOf).min().getAsDouble();
-        }
-
-    }
-
-    private void signUpDialog() {
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
-        alertDialog.setTitle("是否回到登入頁面？");
-        alertDialog.setPositiveButton("是", (dialog, which) -> {
-            // 跳轉到 MainActivity
-            dialog.dismiss();
-
-            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
-            startActivity(intent);
-            finish();
-        });
-        alertDialog.setNegativeButton("否", (dialog, which) -> {
-            dialog.dismiss();
-        });
-        AlertDialog dialog = alertDialog.create();
-        dialog.show();
-
-        dialog.setCancelable(false);
-        dialog.setCanceledOnTouchOutside(false);
-    }
-
-    public void saveInfoToPreference() {
-
-        tinyDB.putInt("count", heartRate.size());
-
-        // 儲存Map
-        Gson gson = new Gson();
-        String dataMapJson = gson.toJson(dataMap);
-        editor.putString("dataMap", dataMapJson);
-
-        tinyDB.putListDouble("heartRate", heartRate);
-        tinyDB.putListDouble("PI", PI);
-        tinyDB.putListDouble("CVI", CVI);
-        tinyDB.putListDouble("C1a", C1a);
-
-        // 儲存其他變數
-        editor.putFloat("averageHR", (float) averageHR);
-        editor.putFloat("averagePI", (float) averagePI);
-        editor.putFloat("averageCVI", (float) averageCVI);
-        editor.putFloat("averageC1a", (float) averageC1a);
-        editor.putFloat("maxPI", (float) maxPI);
-        editor.putFloat("maxCVI", (float) maxCVI);
-        editor.putFloat("maxC1a", (float) maxC1a);
-        editor.putFloat("minPI", (float) minPI);
-        editor.putFloat("minCVI", (float) minCVI);
-        editor.putFloat("minC1a", (float) minC1a);
-        editor.putFloat("ValueHR", (float) ValueHR);
-        editor.putFloat("ValuePI", (float) ValuePI);
-        editor.putFloat("ValueCvi", (float) ValueCvi);
-        editor.putFloat("ValueC1a", (float) ValueC1a);
-
-        editor.apply();
-    }
-
-    public void loadData() {
-        int count = tinyDB.getInt("count");
-        txt_count.setText("目前已註冊" + count + "筆資料\n 如開始量測將會覆蓋此資料");
     }
 
     public static void DrawChart(byte[] result) {
@@ -630,20 +387,21 @@ public class MainActivity extends AppCompatActivity {
                     if (oldValue.size() > 1) {
                         nvalue = Butterworth(oldValue);
                     }
-                    Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
-                    chartSet1Entries.add(chartSet1Entrie);
+                    if (oldValue.size() > 120) {
+                        Entry chartSet1Entrie = new Entry(chartSet1Entries.size(), (float) nvalue);
+                        chartSet1Entries.add(chartSet1Entrie);
+                        saveWaveData.add((float) nvalue);
+                    }
                     chartSet1.setValues(chartSet1Entries);
                     lineChart.setData(new LineData(chartSet1));
                     lineChart.setVisibleXRangeMinimum(300);
                     lineChart.invalidate();
-
                 }
             });
         } catch (Exception ex) {
 //            Log.d("wwwww", "eeeeeerrr = " + ex.toString());
         }
     }
-
 
     public static int getStreamLP(int NewSample) {
         int tmp = 0;
@@ -664,72 +422,6 @@ public class MainActivity extends AppCompatActivity {
         return tmp;
     }
 
-    public static double Butterworth(ArrayList<Double> indata) {
-        try {
-            double deltaTimeinsec = 0.000125;
-            double CutOff = 1921;
-            double Samplingrate = 1 / deltaTimeinsec;
-            Samplingrate = 10000;
-            int dF2 = indata.size() - 1;        // The data range is set with dF2
-            double[] Dat2 = new double[dF2 + 4]; // Array with 4 extra points front and back
-            ArrayList<Double> data = new ArrayList<Double>(); // Ptr., changes passed data
-            // Copy indata to Dat2
-            for (int r = 0; r < dF2; r++) {
-                Dat2[2 + r] = indata.get(r);
-            }
-            Dat2[1] = Dat2[0] = indata.get(0);
-            Dat2[dF2 + 3] = Dat2[dF2 + 2] = indata.get(dF2);
-            double pi = 3.14159265358979;
-            double wc = Math.tan(CutOff * pi / Samplingrate);
-            double k1 = 1.414213562 * wc; // Sqrt(2) * wc
-            double k2 = wc * wc;
-            double a = k2 / (1 + k1 + k2);
-            double b = 2 * a;
-            double c = a;
-            double k3 = b / k2;
-            double d = -2 * a + k3;
-            double e = 1 - (2 * a) - k3;
-            // RECURSIVE TRIGGERS - ENABLE filter is performed (first, last points constant)
-            double[] DatYt = new double[dF2 + 4];
-            DatYt[1] = DatYt[0] = indata.get(0);
-            for (int s = 2; s < dF2 + 2; s++) {
-                DatYt[s] = a * Dat2[s] + b * Dat2[s - 1] + c * Dat2[s - 2]
-                        + d * DatYt[s - 1] + e * DatYt[s - 2];
-            }
-            DatYt[dF2 + 3] = DatYt[dF2 + 2] = DatYt[dF2 + 1];
-
-            // FORWARD filter
-            double[] DatZt = new double[dF2 + 2];
-            DatZt[dF2] = DatYt[dF2 + 2];
-            DatZt[dF2 + 1] = DatYt[dF2 + 3];
-            for (int t = -dF2 + 1; t <= 0; t++) {
-                DatZt[-t] = a * DatYt[-t + 2] + b * DatYt[-t + 3] + c * DatYt[-t + 4]
-                        + d * DatZt[-t + 1] + e * DatZt[-t + 2];
-            }
-
-            // Calculated points copied for return
-            for (int p = 0; p < dF2; p++) {
-                data.add(DatZt[p]);
-            }
-
-
-            return data.get(data.size() - 1);
-        } catch (Exception ex) {
-            Log.d("xxxxx", "exexexex = " + ex.toString());
-            return indata.get(indata.size() - 1);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 350) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("wwwww", "搜尋設備");
-            }
-        }
-    }
-
     public static void ShowToast(final String message) {
         global_activity.runOnUiThread(new Runnable() {
             @Override
@@ -739,37 +431,34 @@ public class MainActivity extends AppCompatActivity {
         });
     }//ShowToast
 
-
     /**
      * 量測與畫圖
      */
-
     @SuppressLint("HandlerLeak")
-    public void RecordWaveAction(View view) {
+    public void startWaveMeasurement(View view) {
         bt4.Bluetooth_init();
-        if (bt4.isconnect) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    lineChart.clear();
-                    lineChart.invalidate();
-                    initchart();
-                }
+        if (bt4.isConnected) {
+            runOnUiThread(() -> {
+                lineChart.clear();
+                initchart();
             });
-            bt4.Wave(true, new Handler());
+
+            bt4.startWave(true, new Handler());
 
             if (!isCountDownRunning) {
-                isDetectOver = false;
+                isMeasurementOver = false;
                 startCountDown();
             }
+        } else {
+            ShowToast("請先連接裝置");
         }
     }
 
     private void startCountDown() {
         isCountDownRunning = true;
-        isDetectOver = false;
+        isMeasurementOver = false;
         countDownHandler.postDelayed(new Runnable() {
-            private int presetTime = 10000;
+            private int presetTime = 6000;
             private int remainingTime = COUNTDOWN_TOTAL_TIME;
 
             @Override
@@ -782,9 +471,9 @@ public class MainActivity extends AppCompatActivity {
                     bt4.isTenSec = true;
                     if (remainingTime <= 0) {//結束的動作
                         txt_countDown.setText("30");
-                        stopWave();
+                        stopWaveMeasurement();
                         isCountDownRunning = false;
-                        isDetectOver = true;
+                        isMeasurementOver = true;
                     } else {//秒數顯示
                         txt_countDown.setText(String.valueOf(remainingTime / 1000));
                         remainingTime -= COUNTDOWN_INTERVAL;
@@ -801,34 +490,45 @@ public class MainActivity extends AppCompatActivity {
         }, COUNTDOWN_INTERVAL);
     }
 
-    private void stopCountdownWave() {
+    private void stopCountdownWaveMeasurement() {
         if (isCountDownRunning) {
             countDownHandler.removeCallbacksAndMessages(null); // 移除倒數
             isCountDownRunning = false;
             txt_countDown.setText("30");
-            stopWave();
+            stopWaveMeasurement();
+            cleanRegisterFile();
         }
     }
 
+    private void cleanRegisterFile() {
+        tinyDB.clear();
+        cleanFile.cleanFile(getFilePath);
+    }
+
     @SuppressLint("HandlerLeak")
-    public void stopWave() {
+    public void stopWaveMeasurement() {
         if (bt4.isWave) {
             ShowToast("正在停止跑波...");
             bt4.StopMeasure(new Handler() {
                 @Override
                 public void handleMessage(Message msg2) {
                     ShowToast("完成停止跑波");
-                    if (isDetectOver) {
-                        readFile();
+
+                    if (isMeasurementOver) {
+                        processMeasurementData();
                     }
                 }
             });
+        } else {
+            ShowToast("尚未開始跑波");
         }
     }
 
-
+    /**
+     * 處理量測檔案
+     */
     @SuppressLint("HandlerLeak")
-    private void readFile() {
+    private void processMeasurementData() {
         final int[] step = {0};
         bt4.Record_Size(new Handler() {
             @Override
@@ -850,7 +550,6 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (step[0] == 3) {
-//                    initCheck();
                     if (bt4.file_data.size() > 0) {
                         saveLP4(bt4.file_data);
                     } else {
@@ -860,6 +559,8 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (step[0] == 4) {
+                    readLP4(getFilePath);
+
                     bt4.Delete_AllRecor(this);
                     bt4.file_data.clear();
                     bt4.Buffer_Array.clear();
@@ -870,70 +571,254 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveLP4(ArrayList<Byte> file_data) {
-
-        new Thread(() -> {
+        try {
             String date = new SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault()).format(System.currentTimeMillis());
-            String folderName = "Apple_ID_Detect"; // 資料夾名稱
-            String s = "r_" + date + "_888888.lp4";
+            String fileName = "r_" + date + "_888888.lp4";
+            getfileName = fileName;
 
-            try {
-                File folder = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), folderName);
-                // 如果資料夾不存在，建立
-                if (!folder.exists()) {
-                    folder.mkdirs();
-                }
+            // 直接在外部存儲目錄中創建文件
+            File fileLocation = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), fileName);
 
-                File fileLocation = new File(folder, s);
-                FileOutputStream fos = new FileOutputStream(fileLocation);
-                byte[] lp4Text = new byte[file_data.size()];
-                for (int i = 0; i < file_data.size(); i++) {
-                    Byte byteValue = file_data.get(i);
-                    if (byteValue != null) {
-                        lp4Text[i] = byteValue.byteValue();
-                    } else {
-                        ShowToast("ERROR!");
-                        lp4Text[i] = 0;
-                    }
-                }
-                fos.write(lp4Text);
-                fos.close();
+            saveByteArrayToFile(file_data, fileLocation);
 
-                MediaScannerConnection.scanFile(this, new String[]{fileLocation.getAbsolutePath()}, null, null);
-                String savedFilePath = fileLocation.getAbsolutePath();
-                ShowToast("檔案已儲存");
-                setChooseFile(savedFilePath);
+            runOnUiThread(() -> {
+                // 在主執行緒中處理 UI 相關的操作
+                ShowToast("LP4儲存成功");
+                MediaScannerConnection.scanFile(this, new String[]{fileLocation.getAbsolutePath()}, null, (path, uri) -> {
+                    getFilePath = path;
+                });
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-            } catch (IOException e) {
-                e.printStackTrace();
+    //byte to double
+    private void makeCSV(ArrayList<Double> doubles, String fileName) {
+        new Thread(() -> {
+            /** 檔名 */
+            String date = new SimpleDateFormat("yyyyMMddhhmmss",
+                    Locale.getDefault()).format(System.currentTimeMillis());
+            String[] title = {"Lead2"};
+            StringBuffer csvText = new StringBuffer();
+            for (int i = 0; i < title.length; i++) {
+                csvText.append(title[i] + ",");
             }
+            /** 內容 */
+            for (int i = 0; i < doubles.size(); i++) {
+                csvText.append("\n" + doubles.get(i));
+            }
+
+            runOnUiThread(() -> {
+                try {
+                    StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
+                    StrictMode.setVmPolicy(builder.build());
+                    builder.detectFileUriExposure();
+                    FileOutputStream out = openFileOutput(fileName, Context.MODE_PRIVATE);
+                    out.write((csvText.toString().getBytes()));
+                    out.close();
+                    File fileLocation = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), fileName);
+                    FileOutputStream fos = new FileOutputStream(fileLocation);
+                    fos.write(csvText.toString().getBytes());
+                    Uri path = Uri.fromFile(fileLocation);
+                    Intent fileIntent = new Intent(Intent.ACTION_SEND);
+                    fileIntent.setType("text/csv");
+                    fileIntent.putExtra(Intent.EXTRA_SUBJECT, fileName);
+                    fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    fileIntent.putExtra(Intent.EXTRA_STREAM, path);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+        }).start();
+    }//makeCSV
+
+    private void makeCSVFloat(List<Float> df1, List<Float> df2, List<Float> df3, List<Float> df4, String fileName) {
+        new Thread(() -> {
+            /** 檔名 */
+            String date = new SimpleDateFormat("yyyyMMddhhmmss", Locale.getDefault()).format(System.currentTimeMillis());
+            String[] titles = {"df1", "df2", "df3", "df4"};
+            StringBuffer csvText = new StringBuffer();
+
+            for (int i = 0; i < titles.length; i++) {
+                csvText.append(titles[i] + ",");
+            }
+
+            int maxSize = Math.max(Math.max(df1.size(), df2.size()), Math.max(df3.size(), df4.size()));
+            for (int i = 0; i < maxSize; i++) {
+
+                if (i < df1.size()) {
+                    csvText.append(df1.get(i));
+                }
+                csvText.append(",");
+
+                if (i < df2.size()) {
+                    csvText.append(df2.get(i));
+                }
+                csvText.append(",");
+
+                if (i < df3.size()) {
+                    csvText.append(df3.get(i));
+                }
+                csvText.append(",");
+
+                if (i < df4.size()) {
+                    csvText.append(df4.get(i));
+                }
+
+                csvText.append("\n");
+            }
+
+            runOnUiThread(() -> {
+                try {
+                    StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
+                    StrictMode.setVmPolicy(builder.build());
+                    builder.detectFileUriExposure();
+                    FileOutputStream out = openFileOutput(fileName, Context.MODE_PRIVATE);
+                    out.write((csvText.toString().getBytes()));
+                    out.close();
+                    File fileLocation = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), fileName);
+                    FileOutputStream fos = new FileOutputStream(fileLocation);
+                    fos.write(csvText.toString().getBytes());
+                    Uri path = Uri.fromFile(fileLocation);
+                    Intent fileIntent = new Intent(Intent.ACTION_SEND);
+                    fileIntent.setType("text/csv");
+                    fileIntent.putExtra(Intent.EXTRA_SUBJECT, fileName);
+                    fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    fileIntent.putExtra(Intent.EXTRA_STREAM, path);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
         }).start();
     }
 
-    public void setChooseFile(String Apath) {
+    /**
+     * 儲存檔案
+     */
+    private void saveByteArrayToFile(ArrayList<Byte> byteList, File file) throws IOException {
+        byte[] byteArray = new byte[byteList.size()];
+        for (int i = 0; i < byteList.size(); i++) {
+            Byte byteValue = byteList.get(i);
+            byteArray[i] = (byteValue != null) ? byteValue : 0;
+        }
 
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                autoDetect(Apath);
-            }
-        });
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            fos.write(byteArray);
+        }
     }
 
-    public void autoDetect(String dir) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                filePath = dir;
-                File file = new File(dir);
-                fileName = file.getName();
+    private void readLP4(String filePath) {
+        File file = new File(filePath);
+        decpEcgFile(filePath);
+        String fileName = file.getName();
+        int y = fileName.length();
+        String j = fileName.substring(0, y - 4);
+        fileName = j + ".CHA"; // Ensure the consistent file extension
 
-                path = filePath.substring(0, filePath.length() - fileName.length());
-                txt_file.setText(fileName);
+        // Debugging: Output file paths
+        Log.d("FilePaths", "LP4 Path: " + filePath);
+        Log.d("FilePaths", "CHA Path: " + fileName);
 
-                initCheck();
+        readCHA(fileName);
+    }
+
+    /**
+     * 讀取CHA
+     */
+    public void readCHA(String fileName) {
+        // Debugging: Output CHA file path
+        Log.d("FilePaths", "CHA Path in readCHA: " + fileName);
+
+        if (!fileName.isEmpty()) {
+            File chaFile = new File(Environment.getExternalStorageDirectory(), fileName);
+            Log.d("FilePaths", "chaFile: " + chaFile);
+            if (chaFile.exists()) {
+                decodeCHAFile = new DecodeCHAFile(chaFile.getAbsolutePath());
+                try {
+                    decodeCHAFile.run();
+                    decodeCHAFile.join();
+                    ShowToast("匯入CHA成功");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                calculateRR(decodeCHAFile.finalCHAData);
+            } else {
+                Log.e("CHAFileNotFound", "CHA檔案不存在：" + fileName);
             }
-        });
+        } else {
+            Log.e("EmptyFileName", "文件名稱為空");
+        }
+    }
 
+    private void calculateRR(List<Float> dataList) {
+        if (dataList == null || dataList.size() == 0) {
+            Log.e("EmptyDataList", "dataList為空");
+        } else {
+            bpmCountThread = new BpmCountThread(dataList);
+            bpmCountThread.run();
+            //makeCsv  ArrayList<Double>
+            //resultFloatArray Float[]
+            ArrayList<Double> doubles = floatArrayToDoubleList(bpmCountThread.resultFloatArray);
+            String date = new SimpleDateFormat("yyyyMMddhhmmss",
+                    Locale.getDefault()).format(System.currentTimeMillis());
+            makeCSV(doubles, "original_" + date + ".csv");
+            calMidError(bpmCountThread.resultFloatArray);
+        }
+    }
+
+    public void calMidError(Float[] floats) {
+        List<Integer> R_index = bpmCountThread.R_index_up;
+        if (R_index.size() > 10) {
+            //取得已經過濾過的RR 100(4張圖)
+            List<Float> df1 = signalProcess.getReduceRR100(Arrays.asList(floats), R_index.get(10), R_index.get(12));
+            List<Float> df2 = signalProcess.getReduceRR100(Arrays.asList(floats), R_index.get(3), R_index.get(5));
+            List<Float> df3 = signalProcess.getReduceRR100(Arrays.asList(floats), R_index.get(6), R_index.get(8));
+            List<Float> df4 = signalProcess.getReduceRR100(Arrays.asList(floats), R_index.get(8), R_index.get(10));
+            overlapChart(chart_df, df1, df2, df3, df4);
+
+            String date = new SimpleDateFormat("yyyyMMddhhmmss", Locale.getDefault()).format(System.currentTimeMillis());
+            makeCSVFloat(df1, df2, df3, df4, "df_" + date + ".csv");
+
+            if (tinyDB.getListFloat("df1").size() < 10) {
+                tinyDB.putString("chooserFileName", getfileName);
+                tinyDB.putListFloat("df1", df1);
+                tinyDB.putListFloat("df2", df2);
+                tinyDB.putListFloat("df3", df3);
+                tinyDB.putListFloat("df4", df4);
+            } else {
+                Log.d("TinyDB", "已經有第一段數據了");
+            }
+            String firstFileName = tinyDB.getString("chooserFileName");
+            //輸出自己與別人的差異
+            List<Float> df1_ = tinyDB.getListFloat("df1");
+            List<Float> df2_ = tinyDB.getListFloat("df2");
+            List<Float> df3_ = tinyDB.getListFloat("df3");
+            List<Float> df4_ = tinyDB.getListFloat("df4");
+            //計算自己的差異
+            float diff12 = signalProcess.calMidDiff(df1, df2);
+            float diff13 = signalProcess.calMidDiff(df1, df3);
+            float diff14 = signalProcess.calMidDiff(df1, df4);
+            float diff23 = signalProcess.calMidDiff(df2, df3);
+            //計算別人的差異(只用df1)
+            float diff12_ = signalProcess.calMidDiff(df1_, df2_);
+            float diff13_ = signalProcess.calMidDiff(df1_, df3);
+            float diff14_ = signalProcess.calMidDiff(df1_, df4);
+            float diff23_ = signalProcess.calMidDiff(df2, df3);
+
+            float averageDiff4Num_self = (diff12 + diff13 + diff14 + diff23) / 4;
+            float averageDiff4Num_sb = (diff12_ + diff13_ + diff14_ + diff23_) / 4;
+
+            if (Objects.equals(firstFileName, fileName)) {
+                Log.d("record", fileName + " 自己的差異度: " + averageDiff4Num_self);
+                txt_result.setText(String.format("自己的差異度: %s", averageDiff4Num_self));
+            } else {
+                Log.d("record", fileName + " 自己的差異度: " + averageDiff4Num_self);
+                Log.d("record", firstFileName + " 與 " + fileName + "的差異度: " + averageDiff4Num_sb);
+                txt_result.setText(String.format("自己的差異度: %s\n與 %s \n差異度: %s", averageDiff4Num_self, firstFileName, averageDiff4Num_sb));
+            }
+        }
     }
 
     public void saveByte(ArrayList<Byte> byteArrayList) {
@@ -952,36 +837,19 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public ArrayList<Double> floatArrayToDoubleList(Float[] arrayList) {
+        // 將 ArrayList<Byte> 轉換為 byte 數組
+        ArrayList<Double> doubleArray = new ArrayList<>();
+        for (int i = 0; i < arrayList.length; i++) {
+            doubleArray.add(Double.valueOf(arrayList[i]));
+        }
+        return doubleArray;
+    }
 
     public void initchart() {
         // 允許滑動
-        lineChart.setDragEnabled(true);
+        chartSetting.initchart(lineChart);
 
-        // 設定縮放
-        lineChart.setScaleEnabled(false);
-        lineChart.setPinchZoom(false);
-
-        // 其他圖表設定
-        lineChart.setData(new LineData());
-        lineChart.getXAxis().setValueFormatter(null);
-        lineChart.getXAxis().setDrawLabels(false);
-        lineChart.getXAxis().setDrawGridLines(false);
-        lineChart.getAxisLeft().setDrawGridLines(false);
-        lineChart.getAxisLeft().setDrawAxisLine(false);
-        lineChart.getAxisLeft().setGranularityEnabled(false);
-        lineChart.getXAxis().setDrawAxisLine(false);
-        lineChart.getAxisLeft().setDrawLabels(false);
-        lineChart.getAxisLeft().setAxisMinimum(1500);
-        lineChart.getAxisLeft().setAxisMaximum(2500);
-        lineChart.getXAxis().setAxisMinimum(0);
-        lineChart.getXAxis().setAxisMaximum(300);
-        lineChart.getXAxis().setGranularity(30);
-        lineChart.getAxisLeft().setGranularity(250);
-        lineChart.getAxisRight().setDrawLabels(false);
-        lineChart.getAxisRight().setDrawGridLines(false);
-        lineChart.getAxisRight().setDrawAxisLine(false);
-        lineChart.getDescription().setText("");
-        lineChart.getLegend().setEnabled(false);
         chartSet1.setColor(Color.BLACK);
         chartSet1.setDrawCircles(false);
         chartSet1.setDrawFilled(false);
@@ -1004,10 +872,68 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public void overlapChart(LineChart lineChart, List<Float> df1, List<Float> df2, List<Float> df3, List<Float> df4) {
+
+        //list float to entry
+        ArrayList<Entry> df1_ = new ArrayList<>();
+        ArrayList<Entry> df2_ = new ArrayList<>();
+        ArrayList<Entry> df3_ = new ArrayList<>();
+        ArrayList<Entry> df4_ = new ArrayList<>();
+        for (int i = 0; i < df1.size(); i++) {
+            Entry entry = new Entry(i, df1.get(i));
+            df1_.add(entry);
+        }
+        for (int i = 0; i < df2.size(); i++) {
+            Entry entry = new Entry(i, df2.get(i));
+            df2_.add(entry);
+        }
+        for (int i = 0; i < df3.size(); i++) {
+            Entry entry = new Entry(i, df3.get(i));
+            df3_.add(entry);
+        }
+        for (int i = 0; i < df4.size(); i++) {
+            Entry entry = new Entry(i, df4.get(i));
+            df4_.add(entry);
+        }
+
+        LineDataSet dataSet1 = createDataSet("df1", Color.RED, df1);
+        LineDataSet dataSet2 = createDataSet("df2", Color.BLUE, df2);
+        LineDataSet dataSet3 = createDataSet("df3", Color.GREEN, df3);
+        LineDataSet dataSet4 = createDataSet("df4", Color.YELLOW, df4);
+
+        YAxis leftAxis = lineChart.getAxisLeft();
+        leftAxis.setEnabled(false);
+        YAxis rightAxis = lineChart.getAxisRight();
+        rightAxis.setEnabled(false);
+        XAxis topAxis = lineChart.getXAxis();
+        topAxis.setEnabled(false);
+
+        LineData lineData = new LineData(dataSet1, dataSet2, dataSet3, dataSet4);
+
+        lineChart.setData(lineData);
+
+        lineChart.invalidate();
+    }
+
+    private LineDataSet createDataSet(String label, int color, List<Float> values) {
+        // 将 List<Float> 轉成 List<Entry>
+        List<Entry> entries = new ArrayList<>();
+        for (int i = 0; i < values.size(); i++) {
+            entries.add(new Entry(i, values.get(i)));
+        }
+
+        LineDataSet dataSet = new LineDataSet(entries, label);
+
+        dataSet.setColor(color);
+        dataSet.setLineWidth(2f);
+        dataSet.setDrawCircles(false);
+        dataSet.setMode(LineDataSet.Mode.LINEAR);
+
+        return dataSet;
+    }
+
+
     public static native int anaEcgFile(String name, String path);
 
-    //    public static native int decpEcgFile(String path);
     public static native int decpEcgFile(String path);
-
-
 }
